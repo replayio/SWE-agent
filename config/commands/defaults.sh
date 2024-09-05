@@ -68,16 +68,17 @@ open() {
     fi
 
     if [[ $1 == /* ]]; then
-        # Absolute path: Check if file is in REPO_ROOT
+        # Absolute path
         FULL_PATH=$1
-        if [[ ! $TARGET_FILE == $REPO_ROOT/* ]]; then
-            echo "Usage: open <file> [<line_number>].\nNOTE: Files must be in $REPO_ROOT. Relative paths preferred."
-            echo "Error: File is not within the repo root directory."
-            return 1
-        fi
     else
-        # Relative path
-        FULL_PATH="${REPO_ROOT}/${1}"
+        # Relative path: resolve relative to PWD
+        FULL_PATH="${PWD}/${1}"
+    fi
+    # make sure file is within REPO_ROOT
+    if [[ ! $(realpath $FULL_PATH) == $REPO_ROOT/* ]]; then
+        echo "Usage: open <file> [<line_number>].\nNOTE: Files must be in $REPO_ROOT. Relative paths preferred."
+        echo "Error: File is not within the repo root directory."
+        return 1
     fi
     if [ -f "$FULL_PATH" ]; then
         export CURRENT_FILE=$(realpath $FULL_PATH)
