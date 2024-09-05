@@ -3,6 +3,7 @@
 service-account-key.json
 **/investigations/investigation-data
 **/investigations/run-logs*
+*~
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -199,3 +200,6 @@ data/**
 
 # PyCharm
 .idea/
+
+requirements-dev.lock
+requirements.lock
