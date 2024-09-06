@@ -135,6 +135,9 @@ class ThoughtActionParser(ParseFunction):
                 start = stack.pop()
                 # Check if it's not nested within another block
                 if not stack:
+                    if last_valid_block is not None:
+                        msg = "Multiple code blocks found in model response.  Your response must have at most one '\\nDISCUSSION\\n' string and at most one command."
+                        raise FormatError(msg)
                     last_valid_block = (start, match)
             elif match.group(1) is not None:  # Opening of a code block
                 stack.append(match)
