@@ -200,6 +200,3 @@ data/**
 
 # PyCharm
 .idea/
-
-requirements-dev.lock
-requirements.lock
