@@ -95,7 +95,7 @@ class CallGraphTracer:
         exc = task.exception()
         if exc:
             tb = exc.__traceback__
-            nodes = []
+            nodes: list[CallTreeNode] = []
             while tb:
                 frame = tb.tb_frame
                 func_name = frame.f_code.co_name
@@ -105,9 +105,8 @@ class CallGraphTracer:
                 node.set_exception(type(exc).__name__)
                 nodes.append(node)
                 tb = tb.tb_next
-            nodes.reverse()
             # Include task creation stack
-            creation_stack = getattr(task, '_creation_stack', [])
+            creation_stack: list[CallTreeNode] = getattr(task, '_creation_stack', [])
             full_stack = creation_stack + nodes
             for i in range(len(full_stack) - 1):
                 full_stack[i].add_child(full_stack[i + 1])
@@ -152,7 +151,7 @@ if supports_async_tracing:
         def new_event_loop(self):
             loop = super().new_event_loop()
             loop.set_task_factory(self.tracing_task_factory)
-            loop.set_exception_handler(_tracer.task_done_callback)
+            loop.set_exception_handler(self.exception_handler)
             return loop
 
         def tracing_task_factory(self, loop, coro):
@@ -165,3 +164,8 @@ if supports_async_tracing:
             task._creation_stack = creation_stack
             task.add_done_callback(_tracer.task_done_callback)
             return task
+
+        def exception_handler(self, loop, context):
+            if 'exception' in context:
+                _tracer.task_done_callback(context['task'])
+            loop.default_exception_handler(context)
