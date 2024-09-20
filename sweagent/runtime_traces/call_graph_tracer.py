@@ -26,7 +26,11 @@ supports_async_tracing = sys.version_info >= (3, 7)
 class CallTreeNode:
     def __init__(self, name: str, filename: str, lineno: int):
         self.name = name
-        self.filename = os.path.relpath(filename)
+        rel_path = os.path.relpath(filename)
+        if rel_path.startswith('..') or os.path.isabs(rel_path):
+            self.filename = f"EXTERNAL/{os.path.basename(filename)}"
+        else:
+            self.filename = rel_path
         self.lineno = lineno
         self.children: List['CallTreeNode'] = []
         self.exception: Optional[str] = None
