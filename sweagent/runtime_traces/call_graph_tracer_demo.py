@@ -1,3 +1,4 @@
+import sys
 import asyncio
 from sweagent.runtime_traces.call_graph_tracer import register_runtime_trace
 
@@ -30,7 +31,7 @@ def test_example():
     function_a()
 
 async def test_async_example1():
-    print("Test async example")
+    print("Test async example 1")
     await asyncio.gather(
         async_function_1(),
         async_function_2(),
@@ -38,7 +39,7 @@ async def test_async_example1():
     )
 
 async def test_async_example2():
-    print("Test async example")
+    print("Test async example 2")
     await asyncio.gather(
         async_function_1(),
         async_function_2(),
@@ -51,50 +52,15 @@ if __name__ == "__main__":
     except ValueError:
         print("Caught ValueError")
 
-    asyncio.run(test_async_example1())
-    asyncio.run(test_async_example2())
+    if sys.version_info >= (3, 7):
+        asyncio.run(test_async_example1())
+        asyncio.run(test_async_example2())
+    else:
+        # For Python 3.6, use alternative to asyncio.run()
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(test_async_example1())
+        loop.run_until_complete(test_async_example2())
+        loop.close()
 
     # Demonstrate uncaught exception
     test_example()
-
-# Expected output:
-"""
-Test example
-Function A
-Function B
-Function C
-Partial call graph for failed test test_example:
-test_example
-  function_a
-    function_b
-      function_c (exception: ValueError)
-Caught ValueError
-
-Test async example
-Async function 1
-Async function 2
-Partial call graph for failed test test_async_example:
-test_async_example
-  async_function_1 (exception: RuntimeError)
-Partial call graph for failed test test_async_example:
-test_async_example
-  async_function_2 (exception: ValueError)
-
-Test example
-Function A
-Function B
-Function C
-Partial call graph for failed test test_example:
-test_example
-  function_a
-    function_b
-      function_c (exception: ValueError)
-Partial call graph for uncaught exception in test test_example:
-test_example
-  function_a
-    function_b
-      function_c (exception: ValueError)
-Traceback (most recent call last):
-  ...
-ValueError: Simulated error
-"""
