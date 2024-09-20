@@ -19,12 +19,12 @@ def function_c():
 async def async_function_1():
     print("Async function 1")
     await asyncio.sleep(0.1)
-    raise RuntimeError("Async error 1")
+    function_c()
 
 async def async_function_2():
     print("Async function 2")
     await asyncio.sleep(0.2)
-    raise ValueError("Async error 2")
+    function_c()
 
 def test_example():
     print("Test example")
