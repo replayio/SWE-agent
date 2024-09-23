@@ -83,7 +83,7 @@ class CallGraphTracer:
             else:
                 return True
         except Exception as err:
-            print(f"DDBG error should_trace {err}")
+            # print(f"DDBG error should_trace {err}")
             return True
 
     def trace_calls(self, frame: FrameType, event: str, arg: Any) -> Optional[Callable]:
@@ -131,7 +131,7 @@ class CallGraphTracer:
                         print(str(current_node), file=sys.stderr)
             return self.trace_calls
         except Exception as err:
-            print(f"DDBG error trace_calls {err}")
+            # print(f"DDBG error trace_calls {err}")
             return None
 
     if python_version >= (3, 7):
@@ -165,7 +165,7 @@ class CallGraphTracer:
                         print("Call graph for task exception:")
                         print(str(root_node))
             except Exception as err:
-                print(f"DDBG error task_done_callback {err}")
+                # print(f"DDBG error task_done_callback {err}")
                 pass
 
 _tracer = None
@@ -200,7 +200,7 @@ def exception_handler(exc_type, exc_value, exc_traceback):
 
 def register_runtime_trace():
     
-    print(f"DDBG register_runtime_trace")
+    # print(f"DDBG register_runtime_trace")
     global _tracer
     _tracer = CallGraphTracer()
     sys.settrace(_tracer.trace_calls)

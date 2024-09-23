@@ -440,6 +440,25 @@ class SWEEnv(gym.Env):
             # Apply test patch so the bug can be repro'ed at all.
             self._apply_test_patch()
 
+            host_root = os.path.join(os.path.dirname(__file__), "../..")
+            host_asset_folder = os.path.abspath(os.path.join(host_root, "prediction_assets"))
+            container_test_folder = os.path.join("/" + self._repo_name, "tests")
+            
+            self.communicate_with_handling(f"ls -l {container_test_folder}")
+            
+            copy_anything_to_container(
+                self.container_obj,
+                host_asset_folder,
+                container_test_folder
+            )
+
+            # TODO: generalize the file location
+            # Reset and modify urls.py:
+            test_file_to_override = os.path.join(container_test_folder, "urls.py")
+            self.communicate_with_handling("git checkout -- tests/urls.py")
+            self.communicate_with_handling(f"echo 'from tests.prediction_assets.call_graph_tracer import register_runtime_trace; register_runtime_trace()' >> {test_file_to_override}")
+            
+
     def copy_string_to_container_file(self, content: str, container_file_path: str) -> None:
         with tempfile.NamedTemporaryFile(mode='w', delete=True) as temp_file:
             temp_file.write(content)
