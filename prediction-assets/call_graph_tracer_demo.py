@@ -1,8 +1,13 @@
 import sys
+import os
 import asyncio
-from sweagent.runtime_traces.call_graph_tracer import register_runtime_trace
+import importlib.util
 
-register_runtime_trace()
+# Add this directory to sys.path.
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__))))
+# Dynamically import ./call_graph_tracer.py.
+module = importlib.import_module("call_graph_tracer")
+module.register_runtime_trace()
 
 def function_a():
     print("Function A")
