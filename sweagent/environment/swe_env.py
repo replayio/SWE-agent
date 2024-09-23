@@ -453,7 +453,8 @@ class SWEEnv(gym.Env):
             )
 
             # TODO: generalize the file location
-            # Reset and modify urls.py:
+            # Reset and modify urls.py
+            #   (Choosing urls.py is a hack: we know that `urls.py` is one of the dynamic imports from runtests.py, so appending to it works.)
             test_file_to_override = os.path.join(container_test_folder, "urls.py")
             self.communicate_with_handling("git checkout -- tests/urls.py")
             self.communicate_with_handling(f"echo 'from tests.prediction_assets.call_graph_tracer import register_runtime_trace; register_runtime_trace()' >> {test_file_to_override}")
