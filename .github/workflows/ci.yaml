@@ -1,0 +1,91 @@
+
+name: CI
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - 'mkdocs.yml'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - 'mkdocs.yml'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Create keys.cfg
+        run: |
+          touch keys.cfg
+      - name: Install rye
+        run: |
+          curl -sSf https://rye.astral.sh/get | bash
+      - name: Install dependencies
+        run: |
+            rye sync
+      - name: Lint replayio files
+        run: |
+            rye lint tdd/**/*.py sweagent/investigations/**/*.py
+
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Pull swe-agent docker container
+        run: |
+          docker pull sweagent/swe-agent:latest
+      - name: Create keys.cfg
+        run: |
+          touch keys.cfg
+      - name: Install rye
+        run: |
+          curl -sSf https://rye.astral.sh/get | bash
+      - name: Install dependencies
+        run: |
+            rye sync
+      - name: Run replayio tests
+        run: |
+            rye run replayio-tests
+
+  typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Pull swe-agent docker container
+        run: |
+          docker pull sweagent/swe-agent:latest
+      - name: Create keys.cfg
+        run: |
+          touch keys.cfg
+      - name: Install rye
+        run: |
+          curl -sSf https://rye.astral.sh/get | bash
+      - name: Install dependencies
+        run: |
+            rye sync
+      - name: Typecheck replayio files
+        run: |
+            rye run replayio-typecheck
