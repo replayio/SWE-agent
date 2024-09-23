@@ -29,12 +29,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+      - name: Setup rye
+        uses: eifinger/setup-rye@v4
+        with:
+          enable-cache: true
       - name: Create keys.cfg
         run: |
           touch keys.cfg
-      - name: Install rye
-        run: |
-          curl -sSf https://rye.astral.sh/get | bash
       - name: Install dependencies
         run: |
             rye sync
@@ -50,15 +51,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+      - name: Setup rye
+        uses: eifinger/setup-rye@v4
+        with:
+          enable-cache: true
       - name: Pull swe-agent docker container
         run: |
           docker pull sweagent/swe-agent:latest
       - name: Create keys.cfg
         run: |
           touch keys.cfg
-      - name: Install rye
-        run: |
-          curl -sSf https://rye.astral.sh/get | bash
       - name: Install dependencies
         run: |
             rye sync
@@ -74,15 +76,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Pull swe-agent docker container
-        run: |
-          docker pull sweagent/swe-agent:latest
-      - name: Create keys.cfg
-        run: |
-          touch keys.cfg
-      - name: Install rye
-        run: |
-          curl -sSf https://rye.astral.sh/get | bash
+      - name: Setup rye
+        uses: eifinger/setup-rye@v4
+        with:
+          enable-cache: true
       - name: Install dependencies
         run: |
             rye sync
