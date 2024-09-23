@@ -23,9 +23,6 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash -l {0}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -33,9 +30,6 @@ jobs:
         uses: eifinger/setup-rye@v4
         with:
           enable-cache: true
-      - name: Create keys.cfg
-        run: |
-          touch keys.cfg
       - name: Install dependencies
         run: |
             rye sync
@@ -45,9 +39,6 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash -l {0}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -70,9 +61,6 @@ jobs:
 
   typecheck:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash -l {0}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
