@@ -42,7 +42,7 @@ jobs:
           touch keys.cfg
       - name: Install rye
         run: |
-          curl -LsSf https://astral.sh/rye/install.sh | sh
+          curl -sSf https://rye.astral.sh/get | bash
       - name: Install dependencies
         run: |
             rye sync
