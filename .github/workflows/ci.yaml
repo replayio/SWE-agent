@@ -35,9 +35,7 @@ jobs:
             rye sync
       - name: Lint replayio files
         run: |
-            pwd
-            ls
-            rye lint tdd/**/*.py sweagent/investigations/**/*.py
+            rye lint tdd/ sweagent/investigations/
 
   test:
     runs-on: ubuntu-latest
