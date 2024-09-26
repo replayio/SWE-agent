@@ -13,6 +13,8 @@ from tenacity import RetryError
 
 from sweagent.agent.commands import Command, ParseCommand
 from sweagent.agent.history_processors import HistoryProcessor
+from sweagent.agent.manual_input import ManualInput
+from sweagent.agent.model_result import AnthropicModelResult
 from sweagent.agent.models import (
     APIStats,
     ContextWindowExceededError,
@@ -194,6 +196,9 @@ class AgentArguments(FlattenedAccess, FrozenSerializable):
     # We put tdd on the agent args because it needs it in post_init.
     tdd: bool = False
 
+    manual_input_conversation_path: Path | None = None
+    manual_input_continuation_label: str | None = None
+
     def __post_init__(self):
         if self.config is None and self.config_file is not None:
             # If unassigned, we load the config from the file to store its contents with the overall arguments
@@ -284,6 +289,8 @@ class Agent:
         self.last_container_id = None
         self.hooks = []
         self.logger = get_logger(f"Agent[{name}]")
+        self.manual_input = ManualInput(args.manual_input_conversation_path, args.manual_input_continuation_label)
+        self.initial_model_response = None
 
     def add_hook(self, hook: AgentHook):
         """Add hook to agent"""
@@ -318,7 +325,7 @@ class Agent:
 
     # Unflag all tdd entries from history, so it can be compressed.
     def _unflag_tdd_history(self):
-        self._assert_tdd_history_entries()
+        # self._assert_tdd_history_entries()
 
         for entry in self.history:
             if "tdd" in entry:
@@ -348,6 +355,21 @@ class Agent:
         assert self.config is not None  # mypy
         self.model.setup(init_model_stats)
         self.instance_args = instance_args
+
+        if self.manual_input.enabled():
+            history_and_patch = self.manual_input.load_conversation()
+            if history_and_patch is not None:
+                history, patch = history_and_patch
+                self.initial_model_response = history[-1]
+                assert self.initial_model_response["role"] == "assistant"
+                assert self.initial_model_response["action"] == "tdd_repro"
+                self.history = history[:-1]
+                self.made_initial_prompt = True
+                if patch is not None:
+                    logger.info(f"Applying patch:\n>>{patch}\n<<")
+                    env._apply_patch(patch)
+                return
+                
 
         # Compose system prompt.
         system_msg = self.config.system_template.format(**self.system_args)
@@ -571,7 +593,16 @@ class Agent:
             action: action that the model proposes
             output: raw model output (not output of the action)
         """
-        thought, action, output = self.forward_with_error_check(observation, state)
+        if self.initial_model_response is not None:
+            thought, action, content = self.initial_model_response["thought"], self.initial_model_response["action"], self.initial_model_response["content"]
+            if isinstance(content, str):
+                output = content
+            else:
+                output = AnthropicModelResult(blocks=content)
+            self.initial_model_response = None
+        else:
+            thought, action, output = self.forward_with_error_check(observation, state)
+
         last_tool_name = get_last_valid_tool_use_name(output)
         last_command = self.get_command(last_tool_name)
         ran_tdd_action = last_command.tdd if last_command else False
@@ -620,7 +651,7 @@ class Agent:
             if self.config.strategy_template is not None:
                 templates.append(self.config.strategy_template)
             # Get tdd_results, to be rendered into the initial_prompt template.
-            state_vars["tdd_results"] = self._make_initial_tdd_result()
+            # state_vars["tdd_results"] = self._make_initial_tdd_result()
         elif observation is None or observation.strip() == "":
             # Show no output template if observation content was empty
             templates = [self.config.next_step_no_output_template]
@@ -646,7 +677,7 @@ class Agent:
         self._append_history(
             {
                 "role": "user",
-                "content": make_user_reply_content(message, None, self.history, False),
+                "content": make_user_reply_content(message, None, self.history, False, self.manual_input.load_continuation_file()),
                 "agent": self.name,
                 "tdd": self.env.tdd and is_init,
             }
@@ -665,7 +696,7 @@ class Agent:
 
         temp_history = self.local_history + [
             {"role": "assistant", "content": make_assistant_content(output), "agent": self.name},
-            {"role": "user", "content": make_user_reply_content(format_error_template, output, self.history, True), "agent": self.name},
+            {"role": "user", "content": make_user_reply_content(format_error_template, output, self.history, True, None), "agent": self.name},
         ]
         return self.model.query(temp_history)
 
@@ -679,7 +710,7 @@ class Agent:
 
         temp_history = self.local_history + [
             {"role": "assistant", "content": make_assistant_content(output), "agent": self.name},
-            {"role": "user", "content": make_user_reply_content(blocklist_error_message, output, self.history, True), "agent": self.name},
+            {"role": "user", "content": make_user_reply_content(blocklist_error_message, output, self.history, True, None), "agent": self.name},
         ]
         return self.model.query(temp_history)
 
@@ -896,12 +927,14 @@ class Agent:
             If return_type is "info_trajectory", returns a tuple of
             the info dictionary and the trajectory (list of dictionaries).
         """
-        self.made_initial_prompt = False
         done = False
         # mypy checks
         assert env.container_obj is not None
         assert env.record is not None
         assert self.config is not None
+
+        self.made_initial_prompt = False
+        self.manual_input.set_instance_id(env.record["instance_id"])
 
         if env.container_obj.id != self.last_container_id:
             self.logger.info(f"Initializing agent settings for container {env.container_obj.id}")
@@ -922,6 +955,7 @@ class Agent:
             for hook in self.hooks:
                 hook.on_step_start()
             state = env.communicate(self.state_command) if self.state_command else None
+            stop_on_tdd_repro = self.manual_input.enabled() and self.initial_model_response is None
             thought, action, output = self.forward(observation, env.get_available_actions(), state)
             for hook in self.hooks:
                 hook.on_actions_generated(thought=thought, action=action, output=repr(output))
@@ -929,6 +963,7 @@ class Agent:
             run_action = self._guard_multiline_input(action)
             for sub_action in self.split_actions(run_action):
                 if sub_action["agent"] == self.name or sub_action["cmd_name"] == self.config.submit_command:
+                    logger.warning(f"ACTION: {sub_action['action']}")
                     for hook in self.hooks:
                         hook.on_sub_action_started(sub_action=sub_action)
                     obs, _, done, info = env.step(sub_action["action"])
@@ -937,6 +972,10 @@ class Agent:
                     observations.append(obs)
                     if sub_action["cmd_name"] == self.config.submit_command:
                         done = True
+                    if sub_action["action"] == "tdd_repro" and stop_on_tdd_repro:
+                        done = True
+                        patch = env.communicate("git add -A && git diff --cached")
+                        self.manual_input.save_conversation(self.history, patch)
                     if done:
                         break
                 else:

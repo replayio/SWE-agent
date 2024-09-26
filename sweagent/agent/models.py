@@ -55,7 +55,7 @@ def get_last_valid_tool_use_block(model_result: ModelQueryResult | None, history
                 tool_use = last_assistant_block
     return tool_use
 
-def make_user_reply_content(action_result: str, model_result: ModelQueryResult | None, history: list[dict[str, any]], is_error: bool):
+def make_user_reply_content(action_result: str, model_result: ModelQueryResult | None, history: list[dict[str, any]], is_error: bool, tool_extra_content: str | None):
     """
     Create a tool_result block from the action_result, model_result, and history.
     action_result: The return value of the action from the environment.
@@ -65,10 +65,13 @@ def make_user_reply_content(action_result: str, model_result: ModelQueryResult |
     tool_use = get_last_valid_tool_use_block(model_result, history)
     if tool_use:
         # This is a reply to a tool_use:
+        if tool_use.name == "tdd_repro" and tool_extra_content is not None:
+            action_result += f"\n\n{tool_extra_content}"
+
         result = {
             "type": "tool_result",
             "tool_use_id": tool_use.id,
-            "content": action_result
+            "content": action_result,
         }
         if is_error:
             result["is_error"] = True
