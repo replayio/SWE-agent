@@ -366,8 +366,16 @@ class Agent:
                 self.history = history[:-1]
                 self.made_initial_prompt = True
                 if patch is not None:
-                    logger.info(f"Applying patch:\n>>{patch}\n<<")
                     env._apply_patch(patch)
+
+                continuation = self.manual_input.load_continuation_file()
+
+                if continuation is not None:
+                    self.logger.info(f"Continuing from manual input:\n{continuation}")
+                    continuation_file_path = "/root/continuation.md"
+                    env.copy_string_to_container_file(continuation, continuation_file_path)
+                    env.communicate_with_handling(f'export MANUAL_INPUT_CONTINUATION_FILE="{continuation_file_path}"')
+
                 return
                 
 
@@ -677,7 +685,7 @@ class Agent:
         self._append_history(
             {
                 "role": "user",
-                "content": make_user_reply_content(message, None, self.history, False, self.manual_input.load_continuation_file()),
+                "content": make_user_reply_content(message, None, self.history, False),
                 "agent": self.name,
                 "tdd": self.env.tdd and is_init,
             }
@@ -696,7 +704,7 @@ class Agent:
 
         temp_history = self.local_history + [
             {"role": "assistant", "content": make_assistant_content(output), "agent": self.name},
-            {"role": "user", "content": make_user_reply_content(format_error_template, output, self.history, True, None), "agent": self.name},
+            {"role": "user", "content": make_user_reply_content(format_error_template, output, self.history, True), "agent": self.name},
         ]
         return self.model.query(temp_history)
 
@@ -710,7 +718,7 @@ class Agent:
 
         temp_history = self.local_history + [
             {"role": "assistant", "content": make_assistant_content(output), "agent": self.name},
-            {"role": "user", "content": make_user_reply_content(blocklist_error_message, output, self.history, True, None), "agent": self.name},
+            {"role": "user", "content": make_user_reply_content(blocklist_error_message, output, self.history, True), "agent": self.name},
         ]
         return self.model.query(temp_history)
 
