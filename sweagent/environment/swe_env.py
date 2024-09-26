@@ -466,14 +466,14 @@ class SWEEnv(gym.Env):
         )
         self.logger.debug(f"[TDD] Applied test patch - output:\n{res}")
 
-    def _apply_patch(self, patch: str) -> None:
+    def apply_conversation_patch(self, patch: str) -> None:
         """
         Apply patch to source in repo
         """
-        patch_path = "/root/model.patch"
+        patch_path = "/root/conversation.patch"
         self.copy_string_to_container_file(patch, patch_path)
-        self.communicate_with_handling(
-            f"cd /{self._repo_name} && cat {patch_path} && git apply -v {patch_path} && rm {patch_path}",
+        res = self.communicate_with_handling(
+            f"cd /{self._repo_name} && git apply -v {patch_path} && rm {patch_path}",
             error_msg="Failed to apply patch",
         )
         self.logger.debug(f"[TDD] Applied previous changes - output:\n{res}")

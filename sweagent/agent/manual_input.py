@@ -63,9 +63,12 @@ class ManualInput:
         with open(os.path.join(new_subdir, "conversation.json"), "w") as f:
             f.write(content)
 
-        if patch is not None:
+        if patch is not None and patch.strip() != "":
             with open(os.path.join(new_subdir, "patch.diff"), "w") as f:
                 f.write(patch)
+
+        subdir_to_print = new_subdir[len(self.base_dir):]
+        logger.info(f"Conversation saved to ${ManualTDDInputEnvVar}%s", subdir_to_print)
 
     def load_conversation(self) -> Tuple[list[dict[str, str]], str] | None:
         if not self.enabled():
@@ -90,5 +93,8 @@ class ManualInput:
                 patch = f.read()
         else:
             patch = None
+
+        dir_to_print = dir[len(self.base_dir):]
+        logger.info("Conversation loaded from ${ManualTDDInputEnvVar}%s", dir_to_print)
 
         return conversation, patch

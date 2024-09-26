@@ -366,7 +366,7 @@ class Agent:
                 self.history = history[:-1]
                 self.made_initial_prompt = True
                 if patch is not None:
-                    env._apply_patch(patch)
+                    env.apply_conversation_patch(patch)
 
                 continuation = self.manual_input.load_continuation_file()
 
@@ -982,8 +982,14 @@ class Agent:
                         done = True
                     if sub_action["action"] == "tdd_repro" and stop_on_tdd_repro:
                         done = True
-                        patch = env.communicate("git add -A && git diff --cached")
-                        self.manual_input.save_conversation(self.history, patch)
+                        output = env.communicate("([ -s /root/test.patch ] && git apply -R < /root/test.patch); git add -A && echo -n '<<CONVERSATION_PATCH||' > /root/conversation-patch && git diff --cached >> /root/conversation-patch && echo -n '||CONVERSATION_PATCH>>' >> /root/conversation-patch && cat /root/conversation-patch")
+
+                        pattern = r"\<\<CONVERSATION_PATCH\|\|(.*)\|\|CONVERSATION_PATCH\>\>"
+
+                        match = re.search(pattern, output, re.DOTALL)
+                        if match is not None:
+                            patch = match.group(1)
+                            self.manual_input.save_conversation(self.history, patch)
                     if done:
                         break
                 else:
