@@ -126,9 +126,10 @@ class CallGraphTracer:
                         current_node = next((node for node in reversed(call_stack) 
                                             if node.name == frame.f_code.co_name 
                                             and node.filename == frame.f_code.co_filename), None) or call_stack[-1]
-                        print("Call graph for exception in current frame:", file=sys.stderr)
+                        print("\n\n<CALL_GRAPH_ON_EXCEPTION where='CURRENT_FRAME'>\n", file=sys.stderr)
                         # TODO: # This causes a duplicate report. Also, the order of frames is not always the same.
                         print(str(current_node), file=sys.stderr)
+                        print("\n</CALL_GRAPH_ON_EXCEPTION>", file=sys.stderr)
             return self.trace_calls
         except Exception as err:
             # print(f"DDBG error trace_calls {err}")
@@ -162,8 +163,9 @@ class CallGraphTracer:
                         full_stack[i].add_child(full_stack[i + 1])
                     if full_stack:
                         root_node = full_stack[0]
-                        print("Call graph for task exception:")
+                        print("\n\n<CALL_GRAPH_ON_EXCEPTION where='FUTURE_DONE_CALLBACK'>")
                         print(str(root_node))
+                        print("\n</CALL_GRAPH_ON_EXCEPTION>", file=sys.stderr)
             except Exception as err:
                 # print(f"DDBG error task_done_callback {err}")
                 pass
@@ -192,8 +194,9 @@ def exception_handler(exc_type, exc_value, exc_traceback):
             for i in range(len(nodes) - 1):
                 nodes[i].add_child(nodes[i + 1])
             if nodes:
-                print("Call graph for uncaught exception:")
+                print("\n\n<CALL_GRAPH_ON_EXCEPTION where='UNCAUGHT_EXCEPTION_HANDLER'>")
                 print(str(nodes[0]))
+                print("\n</CALL_GRAPH_ON_EXCEPTION>", file=sys.stderr)
     except Exception as err:
         pass
     sys.__excepthook__(exc_type, exc_value, exc_traceback)

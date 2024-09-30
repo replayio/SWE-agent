@@ -331,7 +331,7 @@ class Agent:
                 raise ValueError("{tdd_results} not found in instance_template:\n\n" + self.config.instance_template)
             test_result = self.env.communicate("tdd_repro")
             # logger.debug(f"[TDD] Initial Results:\n{test_result}")
-            return f"# ISSUE REPRODUCTION RESULTS<NOTE: These are the results of a test run of tests that reproduce the issue. It contains call trees of failed tests. Start your investigation here./>\n<ISSUE_REPRODUCTION>\n{test_result}\n</ISSUE_REPRODUCTION>\n\n"
+            return f"# ISSUE REPRODUCTION RESULTS<NOTE: These are the results of a test run of tests that reproduce the issue. It contains call graphs  of failed tests. Start your investigation here./>\n<ISSUE_REPRODUCTION>\n{test_result}\n</ISSUE_REPRODUCTION>\n\n"
         return ""
 
     # ###########################################################################
