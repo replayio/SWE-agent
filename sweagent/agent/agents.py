@@ -332,16 +332,6 @@ class Agent:
             if "tdd" in entry:
                 entry["tdd"] = False
 
-    def _make_initial_tdd_result(self) -> str:
-        if self.env.tdd:
-            if "{tdd_results}" not in self.config.instance_template:
-                # {tdd_results} needs to be referenced in instance_template for this to work.
-                raise ValueError("{tdd_results} not found in instance_template:\n\n" + self.config.instance_template)
-            test_result = self.env.communicate("tdd_repro")
-            # logger.debug(f"[TDD] Initial Results:\n{test_result}")
-            return f"# ISSUE REPRODUCTION RESULTS<NOTE: These are the results of a test run of tests that reproduce the issue. Start your investigation here./>\n<ISSUE_REPRODUCTION>\n{test_result}\n</ISSUE_REPRODUCTION>\n\n"
-        return ""
-
     # ###########################################################################
     # setup and more
     # ###########################################################################
@@ -656,8 +646,6 @@ class Agent:
             templates = [self.config.instance_template]
             if self.config.strategy_template is not None:
                 templates.append(self.config.strategy_template)
-            # Get tdd_results, to be rendered into the initial_prompt template.
-            # state_vars["tdd_results"] = self._make_initial_tdd_result()
         elif observation is None or observation.strip() == "":
             # Show no output template if observation content was empty
             templates = [self.config.next_step_no_output_template]
