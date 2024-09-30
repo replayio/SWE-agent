@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from operator import itemgetter
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -14,7 +15,6 @@ from tenacity import RetryError
 from sweagent.agent.commands import Command, ParseCommand
 from sweagent.agent.history_processors import HistoryProcessor
 from sweagent.agent.manual_input import ManualInput
-from sweagent.agent.model_result import AnthropicModelResult
 from sweagent.agent.models import (
     APIStats,
     ContextWindowExceededError,
@@ -23,6 +23,7 @@ from sweagent.agent.models import (
     ModelQueryResult,
     get_last_valid_tool_use_name,
     get_model,
+    make_model_query_result,
     make_assistant_content,
     make_user_reply_content,
 )
@@ -602,11 +603,8 @@ class Agent:
             output: raw model output (not output of the action)
         """
         if self.initial_model_response is not None:
-            thought, action, content = self.initial_model_response["thought"], self.initial_model_response["action"], self.initial_model_response["content"]
-            if isinstance(content, str):
-                output = content
-            else:
-                output = AnthropicModelResult(blocks=content)
+            thought, action, content = itemgetter("thought", "action", "content")(self.initial_model_response)
+            output = make_model_query_result(content)
             self.initial_model_response = None
         else:
             thought, action, output = self.forward_with_error_check(observation, state)
@@ -971,7 +969,6 @@ class Agent:
             run_action = self._guard_multiline_input(action)
             for sub_action in self.split_actions(run_action):
                 if sub_action["agent"] == self.name or sub_action["cmd_name"] == self.config.submit_command:
-                    logger.warning(f"ACTION: {sub_action['action']}")
                     for hook in self.hooks:
                         hook.on_sub_action_started(sub_action=sub_action)
                     obs, _, done, info = env.step(sub_action["action"])

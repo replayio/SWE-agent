@@ -33,6 +33,11 @@ logger = get_logger("api_models")
 _MAX_RETRIES = keys_config.get("SWE_AGENT_MODEL_MAX_RETRIES", 0)
 
 
+def make_model_query_result(content: str | list[ContentBlock]) -> ModelQueryResult:
+    if isinstance(content, str):
+        return content
+    return AnthropicModelResult(blocks=content)
+
 def make_assistant_content(output: ModelQueryResult):
     if isinstance(output, str):
         return output
