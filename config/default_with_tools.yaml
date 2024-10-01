@@ -28,10 +28,10 @@ instance_template: |-
   1. Always make sure to look at the current open file and the CWD. The currently open file might be in a different directory than the working directory! Note that some commands, such as 'create', open files, so they might change the current open file.
   2. CWD is the directory of the repo you are supposed to edit. Only modify files inside this directory. Always provide absolute file paths, prefixed with $PWD.  
 
-  # OUTPUT FORMAT
-  YOUR OUTPUT should always fill in the following template, so as to make sure that you are actually considering dynamic call graph information:
+  # DYNAMIC CALL GRAPH ANALYSIS
+  Whenever you look at a new investigation target, first fill in the following analysis template of the dynamic call graph:
   
-  <INVESTIGATION_TEMPLATE>
+  <CALL_GRAPH_ANALYSIS_TEMPLATE>
   Investigation update:
   * Target: <TARGET/> <!--NOTE: an investigation target is generally a function or a piece of code. Provide its (ideally qualified) name or give it a title, if it has no name.-->
   * Dynamic call graph:
@@ -39,27 +39,20 @@ instance_template: |-
     * Children Count: <COUNT_OF_ALL_CHILDREN/>
     * Children of interest: <CHILDREN_OF_INTEREST/>
   * Goal: <CURRENT_GOAL_OF_INVESTIGATION/>
-  * Locations of interest in <TARGET/>, based on dynamic call graph:
-    * <!--NOTE: Given what you know about the dynamic data and control flow during the test failure, which parts of <TARGET/> should you investigate?-->
-    * <!--NOTE: List as many as you need. Don't omit anything.-->
-    * <LOC_1/>: <EXPLANATION_1/>
-      <IF YOU_CAN_SEE LOC_1>
-      * <FINDINGS_1>
-      </IF YOU_CAN_SEE LOC_1>
-    * <LOC_2/>: <EXPLANATION_2/>
-      <IF YOU_CAN_SEE LOC_2>
-      * <FINDINGS_2>
-      </IF YOU_CAN_SEE LOC_2>
-    * <LOC_3/>: <EXPLANATION_3/>
-      <IF YOU_CAN_SEE LOC_3>
-      * <FINDINGS_3>
-      </IF YOU_CAN_SEE LOC_3>
-    * <LOC_4/>: <EXPLANATION_4/>
-      <IF YOU_CAN_SEE LOC_4>
-      * <FINDINGS_4>
-      </IF YOU_CAN_SEE LOC_4>
+  * <TARGET/>'s children based on DYNAMIC_CALL_GRAPH:
+    * <!--NOTE: List all children of <TARGET/> from DYNAMIC_CALL_GRAPH.-->
+    * <!--NOTE: If you have seen that child, provide information on how this call and its parameters might relate to the bug.-->
+    1. <CHILD_1><LOC_1/>: <EXPLANATION_1/>
+       <IF YOU_CAN_SEE LOC_1>
+       * <SUSPICIOUS_PARAMETERS_FOR_CHILD1/>
+       </IF YOU_CAN_SEE LOC_1></CHILD_1>
+    2. <CHILD_2><LOC_2/>: <EXPLANATION_2/>
+       <IF YOU_CAN_SEE LOC_2>
+       * <SUSPICIOUS_PARAMETERS_FOR_CHILD2/>
+       </IF YOU_CAN_SEE LOC_2></CHILD_2>
+    3. ...
   * Thoughts: <YOUR_THOUGHTS/>
-  </INVESTIGATION_TEMPLATE>
+  </CALL_GRAPH_ANALYSIS_TEMPLATE>
 
 
   (Open file: {open_file})
