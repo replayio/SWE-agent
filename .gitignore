@@ -1,6 +1,7 @@
 # Our re-organized logs.
 sanitized_logs
-investigation-data
+investigation-data/**
+!investigation-data/handpicked_logs/**
 _backup/**
 
 # their logs.

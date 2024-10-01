@@ -12,24 +12,36 @@ module.register_runtime_trace()
 def function_a():
     print("Function A")
     function_b()
+    function_b2()
 
-def function_b():
+def function_b(x = 2):
     print("Function B")
-    function_c()
 
-def function_c():
+def function_b2(x = 2):
+    print("Function B2")
+    function_c(x)
+    function_c2(x)
+
+def function_c(x = 3):
     print("Function C")
+    function_d()
+
+def function_d(x = 3):
+    print("Function D")
+
+def function_c2(x = 3):
+    print("Function C2")
     raise ValueError("Simulated error")
 
 async def async_function_1():
     print("Async function 1")
     await asyncio.sleep(0.1)
-    function_c()
+    function_c2()
 
 async def async_function_2():
     print("Async function 2")
     await asyncio.sleep(0.2)
-    function_c()
+    function_c2()
 
 def test_example():
     print("Test example")
