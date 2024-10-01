@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 import os
-from typing import Callable
+from typing import Callable, Any
 
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from sweagent.investigations.constants import DRIVE_DEFAULT_USER_INDEX
 
-google_drive_service: any = None
+google_drive_service: Any = None
 
 
 def get_google_drive_folder_href(id: str) -> str:
@@ -24,7 +24,7 @@ def get_absolute_path(relative_path: str) -> str:
     return os.path.join(script_dir, relative_path)
 
 
-def get_google_drive_service() -> any:
+def get_google_drive_service() -> Any:
     global google_drive_service
     if google_drive_service:
         return google_drive_service
@@ -125,7 +125,7 @@ def get_or_create_drive_folder(parent_folder_id: str, relative_path: list[str]) 
 
 
 def download_drive_file(
-    dest_path: str, drive_file_id: str, drive_file_size: int = None
+    dest_path: str, drive_file_id: str, drive_file_size: int | None = None
 ):
     skipped: bool = False
     service = get_google_drive_service()

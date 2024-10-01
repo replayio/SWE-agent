@@ -47,6 +47,7 @@ def make_relative_path(fpath: str):
     return os.path.relpath(fpath, get_investigation_data_folder())
 
 def summarize_instance(instance_id: str):
+    nlnl = "\n\n"
     run_data = []
     for run_name in RUN_NAMES:
         syncer = RunLogsSync(run_name)
@@ -56,7 +57,6 @@ def summarize_instance(instance_id: str):
         # eval_folder_href = syncer.get_instance_eval_folder_href(instance_id)
         eval_test_meta_log = syncer.get_eval_meta_log(instance_id)
         eval_test_output = syncer.get_eval_test_output_log(instance_id)
-        nlnl = "\n\n"
         run_data.append(f"""
 ### {run_name}
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Any
 
 from instances import instance_id_list
 
@@ -28,7 +29,7 @@ ROOT_DIR = os.path.join(os.path.dirname(__file__),  "..")
 def trajectory_dir():
     return f"trajectories/{os.getlogin()}/{model_name}__{Path(dataset_name).stem}__{config}__t-{temperature:.2f}__p-{top_p:.2f}__c-{per_instance_cost_limit_usd:.2f}__{install_env}-1"
 
-def run_python_cmd(cmd: str, args: dict[str, str]):
+def run_python_cmd(cmd: str, args: dict[str, Any]):
     # convert args to a string
     args_str = " ".join([f"--{k} {v}" for k, v in args.items()])
     # execute the command

@@ -55,7 +55,7 @@ def recursive_move(src, dst):
 
     elif src_path.is_dir():
         for item in src_path.iterdir():
-            recursive_move(item, dst_path / item.relative_to(src_path), missing_files)
+            recursive_move(item, dst_path / item.relative_to(src_path))
         src_path.rmdir()
         # print(f"Removed empty directory: {src_path}")
 
@@ -216,7 +216,7 @@ class LocalPaths:
                 disentangled_files = self.disentangle_raw_run_log_file(run_log_path)
                 all_disentangled_files.extend(disentangled_files)
 
-            print(f"Disentangled {len(disentangled_files)} instance log files.")
+            print(f"Disentangled {len(all_disentangled_files)} instance log files.")
 
 
 LocalPathsT = TypeVar("LocalPathsT", bound="LocalPaths")
