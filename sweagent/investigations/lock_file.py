@@ -16,7 +16,7 @@ class LockFile:
     def had_lock(self) -> bool:
         return self.locked
     
-    def _lock_file_path(self, label: str = None) -> str:
+    def _lock_file_path(self, label: str | None = None) -> str:
         parent_path = os.path.dirname(self.path)
         target_name = os.path.basename(self.path)
         return f"{parent_path}/{label or self.label}.{target_name}.lock"

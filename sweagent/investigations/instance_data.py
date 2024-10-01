@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import sys
+from typing import Union
 
 import pandas as pd
 
@@ -17,8 +18,12 @@ def get_swe_bench_instance_markdown(instance_id: str):
     df = get_swe_bench_data()
     
     # Select the specific row
-    specific_row = df[df['instance_id'] == instance_id]
+    specific_row: Union[pd.DataFrame, pd.Series] = df[df['instance_id'] == instance_id]
     
+    if isinstance(specific_row, pd.Series):
+        # Convert to DataFrame if it's a Series
+        specific_row = specific_row.to_frame().T
+
     if specific_row.empty:
         return "No data found for the given instance_id."
     
@@ -45,7 +50,11 @@ def generate_cached_image_id(instance_id: str, environment_setup: str = "no_setu
     df = get_swe_bench_data()
 
     # Find the row with the matching instance_id
-    row = df[df["instance_id"] == instance_id]
+    row: Union[pd.DataFrame, pd.Series] = df[df["instance_id"] == instance_id]
+
+    if isinstance(row, pd.Series):
+        # Convert to DataFrame if it's a Series
+        row = row.to_frame().T
 
     if row.empty:
         msg = f"No data found for instance_id: {instance_id}"
