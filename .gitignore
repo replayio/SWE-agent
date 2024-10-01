@@ -1,13 +1,13 @@
 # Our re-organized logs.
 sanitized_logs
-investigation-data/**
-!investigation-data/handpicked_logs/**
+/investigation-data
+
 _backup/**
 
 # their logs.
 logs
-trajectories/**
 !trajectories/demonstrations/**
+trajectories/**
 
 
 # Other
