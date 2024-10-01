@@ -32,14 +32,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Create keys.cfg
-        run: |
-          touch keys.cfg
+        run: touch keys.cfg
       - name: Install rye
-        run: |
-          curl -sSf https://rye.astral.sh/get | bash
+        uses: eifinger/setup-rye@v4
+        with:
+          version: 'latest'
       - name: Install dependencies
-        run: |
-            rye sync
+        run: rye sync
       - name: Typecheck replayio code
-        run: |
-            rye run replayio-typecheck
+        run: rye run replayio-typecheck
