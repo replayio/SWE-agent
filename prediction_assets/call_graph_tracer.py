@@ -9,37 +9,64 @@ import os
 import sys
 import threading
 import traceback
+from json.decoder import JSONDecodeError
 from types import FrameType, TracebackType
-from typing import Any, Callable, Dict, List, Optional  # noqa: UP035
+from typing import Callable, Dict, List, Optional, TypedDict  # noqa: UP035
 
 # Hardcoded target folder for serialization
 REPO_ROOT = os.environ.get("REPO_ROOT") or os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 INSTANCE_NAME = os.environ.get("TDD_INSTANCE_NAME")
-CALL_GRAPH_FOLDER = os.path.join(REPO_ROOT, "_call_graphs_")
 
-# if not INSTANCE_NAME:
-#     raise Exception("TDD_INSTANCE_NAME is not set")
+class TargetConfig(TypedDict):
+    file: Optional[str]
+    function_name: Optional[str]
+    decl_lineno: Optional[int]
 
-IS_11299 = INSTANCE_NAME == "django__django-11299"
+def parse_json(json_string):
+    try:
+        return json.loads(json_string)
+    except JSONDecodeError as e:
+        # Get the position of the error
+        pos = e.pos
+        
+        # Get the line and column of the error
+        lineno = json_string.count('\n', 0, pos) + 1
+        colno = pos - json_string.rfind('\n', 0, pos)
+        
+        # Get the problematic lines (including context)
+        lines = json_string.splitlines()
+        context_range = 2  # Number of lines to show before and after the error
+        start = max(0, lineno - context_range - 1)
+        end = min(len(lines), lineno + context_range)
+        context_lines = lines[start:end]
+        
+        # Create the context string with line numbers
+        context = ""
+        for i, line in enumerate(context_lines, start=start+1):
+            if i == lineno:
+                context += f"{i:4d} > {line}\n"
+                context += "       " + " " * (colno - 1) + "^\n"
+            else:
+                context += f"{i:4d}   {line}\n"
+        
+        # Construct and raise a new error with more information
+        error_msg = f"JSON parsing failed at line {lineno}, column {colno}:\n\n{context.rstrip()}\nError: {str(e)}"
+        raise ValueError(error_msg) from e
 
-# Whether to record parameter values and return values.
-RECORD_VALUES = IS_11299
+# Parse config.
+TDD_TRACE_TARGET_CONFIG_STR = os.environ.get("TDD_TRACE_TARGET_CONFIG")
+TDD_TRACE_TARGET_CONFIG: Optional[TargetConfig] = None
+if TDD_TRACE_TARGET_CONFIG_STR:
+    TDD_TRACE_TARGET_CONFIG = parse_json(TDD_TRACE_TARGET_CONFIG_STR)
+    if TDD_TRACE_TARGET_CONFIG:
+        if "target_file" not in TDD_TRACE_TARGET_CONFIG:
+            raise ValueError("TDD_TRACE_TARGET_CONFIG must provide 'target_file'.")
+        if "target_function_name" not in TDD_TRACE_TARGET_CONFIG:
+            raise ValueError("TDD_TRACE_TARGET_CONFIG must provide 'target_function_name' if 'target_file' is provided.")
 
-# Whether to only print a partial subgraph.
-FORCE_PARTIAL_GRAPH = "_add_q" if IS_11299 else None
+# Record parameter values and return values, only if target region is sufficiently scoped.
+RECORD_VALUES = not not TDD_TRACE_TARGET_CONFIG
 
-
-# For testing:
-# RECORD_VALUES = True
-# FORCE_PARTIAL_GRAPH = "function_b2"
-
-# Ensure the serialization folder exists
-os.makedirs(CALL_GRAPH_FOLDER, exist_ok=True)
-
-
-def make_file_path(root_name: str) -> str:
-    filename = f"{INSTANCE_NAME}_{root_name}.json"
-    return os.path.join(CALL_GRAPH_FOLDER, filename)
 
 
 class FrameInfo:
@@ -119,6 +146,16 @@ else:
             setattr(self.local, "value", value)
 
 
+def get_relative_filename(filename: str) -> str:
+    try:
+        rel_path = os.path.relpath(filename)
+        if rel_path.startswith("..") or os.path.isabs(rel_path):
+            return f"EXTERNAL/{os.path.basename(filename)}"
+        else:
+            return rel_path
+    except Exception:
+        return filename
+
 class BaseNode:
     def __init__(self):
         self.children: List[BaseNode] = []
@@ -139,17 +176,6 @@ class OmittedNode(BaseNode):
 
     def to_dict(self):
         return {"name": self.name, "type": "OmittedNode"}
-
-
-def get_relative_filename(filename: str) -> str:
-    try:
-        rel_path = os.path.relpath(filename)
-        if rel_path.startswith("..") or os.path.isabs(rel_path):
-            return f"EXTERNAL/{os.path.basename(filename)}"
-        else:
-            return rel_path
-    except Exception:
-        return filename
 
 class CallGraphNode(BaseNode):
     is_partial: bool = False
@@ -207,47 +233,10 @@ class CallGraphNode(BaseNode):
             result += child.__str__(level + 1, visited)
         return result
 
-    # TODO: Serialization does not work yet because `frame`, are not serialized and `params` and other runtime values cannot be serialized like this.
-    # def to_dict(self):
-    #     return {
-    #         "decl_filename": self.frame_info.decl_filename,
-    #         "decl_lineno": self.frame_info.decl_lineno,
-    #         "call_filename": self.frame_info.call_filename,
-    #         "call_lineno": self.frame_info.call_lineno,
-    #         "function_name": self.frame_info.function_name,
-
-    #         "exception": self.exception,
-    #         "parameters": self.parameters,
-    #         "return_value": self.return_value,
-    #         "children": [child.to_dict() for child in self.children],
-    #         "type": "CallTreeNode",
-    #     }
-
-    # @classmethod
-    # def from_dict(cls, data: Dict[str, Any]) -> "CallGraphNode":
-    #     frame_info = FrameInfo(
-    #         decl_filename=data["filename"],
-    #         decl_lineno=data["decl_lineno"],
-    #         call_filename=data.get("call_filename"),
-    #         call_lineno=data["call_lineno"],
-    #         function_name=data["function_name"],
-    #     )
-    #     node = cls(frame_info)
-    #     node.exception = data["exception"]
-    #     node.parameters = data["parameters"]
-    #     node.return_value = data["return_value"]
-    #     for child_data in data["children"]:
-    #         if child_data["type"] == "CallTreeNode":
-    #             child = CallGraphNode.from_dict(child_data)
-    #         else:
-    #             child = OmittedNode()
-    #         node.add_child(child)
-    #     return node
-
 class CallGraph:
     def __init__(self):
         self.call_stack: List[CallGraphNode] = ContextVar("call_stack", default=[])
-        self.root: Optional[BaseNode] = None
+        self.root: Optional[CallGraphNode] = None
         self.is_partial: bool = False
         try:
             self.cwd = os.getcwd()
@@ -272,7 +261,7 @@ class CallGraph:
         
     def access_call_stack(self) -> List[CallGraphNode]:
         call_stack = self.call_stack.get()
-        res: List[BaseNode] = call_stack.copy()
+        res: List[CallGraphNode] = call_stack.copy()
         return res
 
     def trace_calls(self, frame: FrameType, event: str, arg: any) -> Optional[Callable]:
@@ -327,21 +316,24 @@ class CallGraph:
         except Exception:
             return None
 
-    def get_partial_graph(self, name: str) -> Optional[BaseNode]:
+    def find_node(self, target_config: TargetConfig) -> Optional[CallGraphNode]:
+        root = self.root
+        stack = [root]
+        while stack:
+            node = stack.pop()
+            if (node.name == target_config.get('target_function_name') and
+                node.decl_filename == target_config.get('target_file') and
+                (target_config.get('decl_lineno') is None or 
+                node.frame_info.decl_lineno == target_config['decl_lineno'])):
+                return node
+            stack.extend(reversed(node.children))
+        return None
+
+    def get_partial_graph(self, target_config: TargetConfig) -> Optional[BaseNode]:
         """
         Create a partial graph of the first function call of given name.
         Should only contain the flat call graph surrounding that node, i.e. its parent and its children.
         """
-
-        def find_node_iterative(root: BaseNode, target_name: str) -> Optional[BaseNode]:
-            stack = [root]
-            while stack:
-                node = stack.pop()
-                if node.name == target_name:
-                    return node
-                stack.extend(reversed(node.children))
-            return None
-
 
         def create_partial_node(node: CallGraphNode) -> CallGraphNode:
             partial_node = CallGraphNode(node.frame_info)
@@ -354,7 +346,7 @@ class CallGraph:
         if not self.root:
             return None
 
-        target_node = find_node_iterative(self.root, name)
+        target_node = self.find_node(target_config)
         if not target_node:
             return None
 
@@ -380,37 +372,20 @@ class CallGraph:
 
         return root
 
-    # def store(self):
-    #     if not self.root:
-    #         return
-
-    #     root_name = self.root.name if self.root.name else "unknown"
-    #     filepath = make_file_path(root_name)
-
-    #     data = {"root": self.root.to_dict(), "is_partial": self.is_partial}
-
-    #     with open(filepath, "w") as f:
-    #         json.dump(data, f, indent=2)
-
-    # @classmethod
-    # def load(cls, root_name: str) -> "CallGraph":
-    #     filepath = make_file_path(root_name)
-    #     with open(filepath) as f:
-    #         data = json.load(f)
-
-    #     tracer = cls()
-    #     tracer.root = CallGraphNode.from_dict(data["root"])
-    #     tracer.is_partial = data["is_partial"]
-    #     return tracer
-
-    def print_graph_on_exception(self, where: str, node: BaseNode):
-        if FORCE_PARTIAL_GRAPH:
-            node = self.get_partial_graph(FORCE_PARTIAL_GRAPH)
-            partial_info = f" PARTIAL='{FORCE_PARTIAL_GRAPH}'"
+    def print_graph_on_exception(self, cause: str, node: BaseNode):
+        result: str = None
+        if TDD_TRACE_TARGET_CONFIG:
+            partial_graph = self.get_partial_graph(TDD_TRACE_TARGET_CONFIG)
+            partial_info = f" PARTIAL='{str(TDD_TRACE_TARGET_CONFIG)}'"
+            if partial_graph:
+                result = str(partial_graph)
+            else:
+                result = "(❌ ERROR: Could not find target function. Providing high-level call graph instead. ❌)\n" + str(node)
         else:
             partial_info = ""
-        print("\n\n" + f"<CALL_GRAPH_ON_EXCEPTION where='{where}'{partial_info}>", file=sys.stderr)
-        print(str(node), file=sys.stderr)
+            result = str(node)
+        print("\n\n" + f"<CALL_GRAPH_ON_EXCEPTION cause='{cause}'{partial_info}>", file=sys.stderr)
+        print(result, file=sys.stderr)
         print("\n</CALL_GRAPH_ON_EXCEPTION>", file=sys.stderr)
 
     if python_version >= (3, 7):

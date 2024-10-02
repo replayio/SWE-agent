@@ -1,7 +1,14 @@
-import sys
-import os
-import asyncio
+import asyncio  # noqa: I002
 import importlib.util
+import os
+import sys
+
+os.environ["TDD_TRACE_TARGET_CONFIG"] = """
+{
+    "target_file": "prediction_assets/call_graph_tracer_demo.py",
+    "target_function_name": "function_that_throws"
+}
+""".strip()
 
 # Add this directory to sys.path.
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__))))
@@ -28,7 +35,7 @@ def function_b(x = 2):
 def function_b2(x = 2):
     print("Function B2")
     function_c(x)
-    function_c2(x)
+    function_that_throws(x)
 
 def function_c(x = 3):
     print("Function C")
@@ -37,19 +44,19 @@ def function_c(x = 3):
 def function_d(x = 3):
     print("Function D")
 
-def function_c2(x = 3):
-    print("Function C2")
+def function_that_throws(x = 3):
+    print("Function that throws")
     raise ValueError("Simulated error")
 
 async def async_function_1():
     print("Async function 1")
     await asyncio.sleep(0.1)
-    function_c2()
+    function_that_throws()
 
 async def async_function_2():
     print("Async function 2")
     await asyncio.sleep(0.2)
-    function_c2()
+    function_that_throws()
 
 def test_example():
     print("Test example")
