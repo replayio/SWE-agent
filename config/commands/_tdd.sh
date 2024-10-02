@@ -1,6 +1,6 @@
 # @yaml
 # tdd: true
-# signature: tdd_repro ["<target_file>"] [<target_function_name>] [<decl_lineno>]
+# signature: tdd_repro ["<target_file>"] ["<target_function_name>"] [<decl_lineno>]
 # docstring: Reproduces the bug by running bug-specific tests. Provide optional target arguments to get runtime context for the target function.
 # arguments:
 #  target_file:
@@ -24,7 +24,8 @@ tdd_repro() {
     pushd $REPO_ROOT > /dev/null
     echo -e "Running tests to reproduce the bug (from $PWD):\n >$TEST_CMD_FAIL_TO_PASS\n"
     if [ $# -ge 1 ]; then
-        export TDD_TRACE_TARGET_CONFIG="{ \"target_file\": \"$1\", \"target_function_name\": \"$2\", \"decl_lineno\": $3}"
+        line_no=${3:-0}
+        export TDD_TRACE_TARGET_CONFIG="{ \"target_file\": \"$1\", \"target_function_name\": \"$2\", \"decl_lineno\": $line_no}"
     fi
     eval "$TEST_CMD_FAIL_TO_PASS"
     popd > /dev/null

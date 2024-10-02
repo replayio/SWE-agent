@@ -27,9 +27,13 @@ instance_template: |-
   # PROBLEM SOLVING STRATEGY
   1. Always make sure to look at the current open file and the CWD. The currently open file might be in a different directory than the working directory! Note that some commands, such as 'create', open files, so they might change the current open file.
   2. CWD is the directory of the repo you are supposed to edit. Only modify files inside this directory. Always provide absolute file paths, prefixed with $PWD.  
+  3. ALWAYS make sure to first investigate the dynamic call graph. HEED THE "OUTPUT TEMPLATE" instructions.
 
-  # DYNAMIC CALL GRAPH ANALYSIS
-  Whenever you look at a new investigation target, first fill in the following analysis template for your investigation of the current investigation target in CALL_GRAPH_ON_EXCEPTION:
+  # OUTPUT TEMPLATE
+  At every step:
+  
+  * For every function you are investigating, first run `tdd_repro <TARGET_FILE/> <TARGET_FUNCTION_NAME/>` to get targeted runtime data for each FUNCTION YOU ARE INVESTIGATING. Don't look at the code OF ANY FUNCTION before you have done this step. You must do this FOR EVERY FUNCTION, not just the test function.
+  * In a follow-up message fill in the following analysis template for your investigation of the resulting CALL_GRAPH_ON_EXCEPTION for TARGET_FUNCTION_NAME:
   
   <CALL_GRAPH_ANALYSIS_TEMPLATE>
   Investigation update:

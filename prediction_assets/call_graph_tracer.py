@@ -60,7 +60,8 @@ if TRACE_TARGET_CONFIG_STR:
 # Record parameter values and return values, only if target region is sufficiently scoped.
 RECORD_VALUES = not not TRACE_TARGET_CONFIG
 
-MUTE_EXCEPTIONS = False
+# NOTE: We need to mute exceptions because some of them get thrown during teardown where builtins are straight up gone.
+MUTE_EXCEPTIONS = True
 
 # REPO_ROOT = os.environ.get("REPO_ROOT") or os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 # INSTANCE_NAME = os.environ.get("TDD_INSTANCE_NAME")
@@ -309,7 +310,7 @@ class CallGraph:
                     if test_node:
                         self.print_graph_on_exception("EXCEPTION", test_node)
             return self.trace_calls
-        except Exception:
+        except Exception as err:
             if not MUTE_EXCEPTIONS:
                 print("\n\n\nERROR IN trace_calls:\n\n\n")
                 traceback.print_exc()
@@ -322,7 +323,7 @@ class CallGraph:
             node = stack.pop()
             if (node.name == target_config.get('target_function_name') and
                 node.decl_filename == target_config.get('target_file') and
-                (target_config.get('decl_lineno') is None or 
+                (not target_config.get('decl_lineno') or 
                 node.frame_info.decl_lineno == target_config['decl_lineno'])):
                 return node
             stack.extend(reversed(node.children))
