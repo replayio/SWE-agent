@@ -50,7 +50,7 @@ class FrameInfo:
         decl_lineno: Optional[int] = None,
         call_filename: Optional[str] = None,
         call_lineno: Optional[int] = None,
-        function: Optional[str] = None,
+        function_name: Optional[str] = None,
         code_context: Optional[List[str]] = None,
         index: Optional[int] = None,
     ):
@@ -61,7 +61,7 @@ class FrameInfo:
         self.call_filename = call_filename or (frame.f_back.f_code.co_filename if frame and frame.f_back else None)
         self.call_lineno = call_lineno or (frame.f_lineno if frame else None)
 
-        self.function_name = function or (frame.f_code.co_name if frame else None)
+        self.function_name = function_name or (frame.f_code.co_name if frame else None)
         self.code_context = code_context
         self.index = index
 
@@ -141,27 +141,39 @@ class OmittedNode(BaseNode):
         return {"name": self.name, "type": "OmittedNode"}
 
 
+def get_relative_filename(filename: str) -> str:
+    try:
+        rel_path = os.path.relpath(filename)
+        if rel_path.startswith("..") or os.path.isabs(rel_path):
+            return f"EXTERNAL/{os.path.basename(filename)}"
+        else:
+            return rel_path
+    except Exception:
+        return filename
+
 class CallGraphNode(BaseNode):
     is_partial: bool = False
 
     def __init__(self, frame_info: FrameInfo):
         super().__init__()
-        self.name = frame_info.get_name()
-        try:
-            rel_path = os.path.relpath(frame_info.decl_filename)
-            if rel_path.startswith("..") or os.path.isabs(rel_path):
-                self.decl_filename = f"EXTERNAL/{os.path.basename(frame_info.decl_filename)}"
-            else:
-                self.decl_filename = rel_path
-        except Exception:
-            self.decl_filename = frame_info.decl_filename
-        self.lineno = frame_info.call_lineno
-        self.decl_lineno = frame_info.decl_lineno
+        self.frame_info = frame_info
         self.children: list[CallGraphNode] = []
         self.exception: Optional[str] = None
         self.parameters: Dict[str, any] = {}
         self.return_value: any = None
         self.parent: Optional[CallGraphNode] = None
+
+    @property
+    def name(self) -> str:
+        return self.frame_info.get_name()
+
+    @property
+    def decl_filename(self) -> str:
+        return get_relative_filename(self.frame_info.decl_filename)
+
+    @property
+    def call_filename(self) -> str:
+        return get_relative_filename(self.frame_info.call_filename)
 
     def set_exception(self, exc_name: str):
         self.exception = exc_name
@@ -181,12 +193,11 @@ class CallGraphNode(BaseNode):
             return "  " * level + "[Recursion]\n"
         visited.add(id(self))
         indent = "  " * level
-        result = f"{indent}{self.name}" + f" [decl: {self.decl_filename}:{self.decl_lineno}"
-        if self.lineno != self.decl_lineno:
-            result += f", called from: {self.call_filename or "?"}:{self.call_lineno or "?"}"
+        result = f"{indent}{self.name}" + f" [decl: {self.decl_filename}:{self.frame_info.decl_lineno}"
+        if self.frame_info.call_lineno != self.frame_info.decl_lineno:
+            result += f", called from: {self.call_filename or '?'}:{self.frame_info.call_lineno or '?'}"
         result += "]"
         if RECORD_VALUES:
-            # TODO: This generates way too much data. Need more precise tools to get the right data.
             if self.parameters:
                 result += f", Parameters:{self.parameters}"
             if self.return_value is not None:
@@ -196,38 +207,42 @@ class CallGraphNode(BaseNode):
             result += child.__str__(level + 1, visited)
         return result
 
-    def to_dict(self):
-        return {
-            "name": self.name,
-            "filename": self.decl_filename,
-            "lineno": self.lineno,
-            "decl_lineno": self.decl_lineno,
-            "exception": self.exception,
-            "parameters": self.parameters,
-            "return_value": self.return_value,
-            "children": [child.to_dict() for child in self.children],
-            "type": "CallTreeNode",
-        }
+    # TODO: Serialization does not work yet because `frame`, are not serialized and `params` and other runtime values cannot be serialized like this.
+    # def to_dict(self):
+    #     return {
+    #         "decl_filename": self.frame_info.decl_filename,
+    #         "decl_lineno": self.frame_info.decl_lineno,
+    #         "call_filename": self.frame_info.call_filename,
+    #         "call_lineno": self.frame_info.call_lineno,
+    #         "function_name": self.frame_info.function_name,
 
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CallGraphNode":
-        # TODO: fix this to not require a dummy FrameInfo object
-        node = cls(FrameInfo(FrameType()))  # Create a dummy FrameInfo object
-        node.name = data["name"]
-        node.decl_filename = data["filename"]
-        node.lineno = data["lineno"]
-        node.decl_lineno = data["decl_lineno"]
-        node.exception = data["exception"]
-        node.parameters = data["parameters"]
-        node.return_value = data["return_value"]
-        for child_data in data["children"]:
-            if child_data["type"] == "CallTreeNode":
-                child = CallGraphNode.from_dict(child_data)
-            else:
-                child = OmittedNode()
-            node.add_child(child)
-        return node
+    #         "exception": self.exception,
+    #         "parameters": self.parameters,
+    #         "return_value": self.return_value,
+    #         "children": [child.to_dict() for child in self.children],
+    #         "type": "CallTreeNode",
+    #     }
 
+    # @classmethod
+    # def from_dict(cls, data: Dict[str, Any]) -> "CallGraphNode":
+    #     frame_info = FrameInfo(
+    #         decl_filename=data["filename"],
+    #         decl_lineno=data["decl_lineno"],
+    #         call_filename=data.get("call_filename"),
+    #         call_lineno=data["call_lineno"],
+    #         function_name=data["function_name"],
+    #     )
+    #     node = cls(frame_info)
+    #     node.exception = data["exception"]
+    #     node.parameters = data["parameters"]
+    #     node.return_value = data["return_value"]
+    #     for child_data in data["children"]:
+    #         if child_data["type"] == "CallTreeNode":
+    #             child = CallGraphNode.from_dict(child_data)
+    #         else:
+    #             child = OmittedNode()
+    #         node.add_child(child)
+    #     return node
 
 class CallGraph:
     def __init__(self):
@@ -308,12 +323,8 @@ class CallGraph:
                             or call_stack[-1]
                         )
                         self.print_graph_on_exception("EXCEPTION", root_node)
-                        # self.store()  # Store the call graph when an exception occurs
             return self.trace_calls
         except Exception:
-            # TODO: This is muted because it triggers at the end of every test run during teardown because apparently builtins are just disappearing at that point.
-            # print("\n\n\nERROR IN trace_calls:\n\n\n")
-            # traceback.print_exc()
             return None
 
     def get_partial_graph(self, name: str) -> Optional[BaseNode]:
@@ -331,13 +342,9 @@ class CallGraph:
                 stack.extend(reversed(node.children))
             return None
 
+
         def create_partial_node(node: CallGraphNode) -> CallGraphNode:
-            # TODO: fix this to not require a dummy FrameInfo object
-            partial_node = CallGraphNode(FrameInfo(FrameType()))  # Create a dummy FrameInfo object
-            partial_node.name = node.name
-            partial_node.decl_filename = node.decl_filename
-            partial_node.lineno = node.lineno
-            partial_node.decl_lineno = node.decl_lineno
+            partial_node = CallGraphNode(node.frame_info)
             partial_node.parameters = node.parameters
             partial_node.return_value = node.return_value
             partial_node.exception = node.exception
@@ -373,28 +380,28 @@ class CallGraph:
 
         return root
 
-    def store(self):
-        if not self.root:
-            return
+    # def store(self):
+    #     if not self.root:
+    #         return
 
-        root_name = self.root.name if self.root.name else "unknown"
-        filepath = make_file_path(root_name)
+    #     root_name = self.root.name if self.root.name else "unknown"
+    #     filepath = make_file_path(root_name)
 
-        data = {"root": self.root.to_dict(), "is_partial": self.is_partial}
+    #     data = {"root": self.root.to_dict(), "is_partial": self.is_partial}
 
-        with open(filepath, "w") as f:
-            json.dump(data, f, indent=2)
+    #     with open(filepath, "w") as f:
+    #         json.dump(data, f, indent=2)
 
-    @classmethod
-    def load(cls, root_name: str) -> "CallGraph":
-        filepath = make_file_path(root_name)
-        with open(filepath) as f:
-            data = json.load(f)
+    # @classmethod
+    # def load(cls, root_name: str) -> "CallGraph":
+    #     filepath = make_file_path(root_name)
+    #     with open(filepath) as f:
+    #         data = json.load(f)
 
-        tracer = cls()
-        tracer.root = CallGraphNode.from_dict(data["root"])
-        tracer.is_partial = data["is_partial"]
-        return tracer
+    #     tracer = cls()
+    #     tracer.root = CallGraphNode.from_dict(data["root"])
+    #     tracer.is_partial = data["is_partial"]
+    #     return tracer
 
     def print_graph_on_exception(self, where: str, node: BaseNode):
         if FORCE_PARTIAL_GRAPH:
@@ -507,7 +514,6 @@ def exception_handler(exc_type, exc_value, exc_traceback):
                 nodes[i].add_child(nodes[i + 1])
             if nodes:
                 _current_graph.print_graph_on_exception("UNCAUGHT_EXCEPTION_HANDLER", nodes[0])
-                # _current_graph.store()  # Store the call graph when an uncaught exception occurs
     except Exception:
         print("\n\n\nERROR IN exception_handler:\n\n\n")
         traceback.print_exc()
