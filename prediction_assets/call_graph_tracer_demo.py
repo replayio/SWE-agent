@@ -6,13 +6,15 @@ import sys
 os.environ["TDD_TRACE_TARGET_CONFIG"] = """
 {
     "target_file": "prediction_assets/call_graph_tracer_demo.py",
-    "target_function_name": "function_that_throws"
+    "target_function_name": "function_that_throws",
+    "decl_lineno": 48
 }
 """.strip()
 
 # Add this directory to sys.path.
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__))))
-# Dynamically import ./call_graph_tracer.py.
+
+# Dynamically import ./call_graph_tracer.py and inject it:
 module = importlib.import_module("call_graph_tracer")
 module.register_runtime_trace()
 

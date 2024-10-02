@@ -13,9 +13,8 @@ from json.decoder import JSONDecodeError
 from types import FrameType, TracebackType
 from typing import Callable, Dict, List, Optional, TypedDict  # noqa: UP035
 
-# Hardcoded target folder for serialization
-REPO_ROOT = os.environ.get("REPO_ROOT") or os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-INSTANCE_NAME = os.environ.get("TDD_INSTANCE_NAME")
+# REPO_ROOT = os.environ.get("REPO_ROOT") or os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+# INSTANCE_NAME = os.environ.get("TDD_INSTANCE_NAME")
 
 class TargetConfig(TypedDict):
     file: Optional[str]
@@ -54,18 +53,18 @@ def parse_json(json_string):
         raise ValueError(error_msg) from e
 
 # Parse config.
-TDD_TRACE_TARGET_CONFIG_STR = os.environ.get("TDD_TRACE_TARGET_CONFIG")
-TDD_TRACE_TARGET_CONFIG: Optional[TargetConfig] = None
-if TDD_TRACE_TARGET_CONFIG_STR:
-    TDD_TRACE_TARGET_CONFIG = parse_json(TDD_TRACE_TARGET_CONFIG_STR)
-    if TDD_TRACE_TARGET_CONFIG:
-        if "target_file" not in TDD_TRACE_TARGET_CONFIG:
+TRACE_TARGET_CONFIG_STR = os.environ.get("TDD_TRACE_TARGET_CONFIG")
+TRACE_TARGET_CONFIG: Optional[TargetConfig] = None
+if TRACE_TARGET_CONFIG_STR:
+    TRACE_TARGET_CONFIG = parse_json(TRACE_TARGET_CONFIG_STR)
+    if TRACE_TARGET_CONFIG:
+        if "target_file" not in TRACE_TARGET_CONFIG:
             raise ValueError("TDD_TRACE_TARGET_CONFIG must provide 'target_file'.")
-        if "target_function_name" not in TDD_TRACE_TARGET_CONFIG:
+        if "target_function_name" not in TRACE_TARGET_CONFIG:
             raise ValueError("TDD_TRACE_TARGET_CONFIG must provide 'target_function_name' if 'target_file' is provided.")
 
 # Record parameter values and return values, only if target region is sufficiently scoped.
-RECORD_VALUES = not not TDD_TRACE_TARGET_CONFIG
+RECORD_VALUES = not not TRACE_TARGET_CONFIG
 
 
 
@@ -374,13 +373,17 @@ class CallGraph:
 
     def print_graph_on_exception(self, cause: str, node: BaseNode):
         result: str = None
-        if TDD_TRACE_TARGET_CONFIG:
-            partial_graph = self.get_partial_graph(TDD_TRACE_TARGET_CONFIG)
-            partial_info = f" PARTIAL='{str(TDD_TRACE_TARGET_CONFIG)}'"
+        if TRACE_TARGET_CONFIG:
+            partial_graph = self.get_partial_graph(TRACE_TARGET_CONFIG)
+            partial_info = f" PARTIAL='{str(TRACE_TARGET_CONFIG)}'"
             if partial_graph:
                 result = str(partial_graph)
             else:
+                # Hackfix: Stringify without values, if we could not target the function.
+                global RECORD_VALUES
+                RECORD_VALUES = False
                 result = "(❌ ERROR: Could not find target function. Providing high-level call graph instead. ❌)\n" + str(node)
+                RECORD_VALUES = True
         else:
             partial_info = ""
             result = str(node)

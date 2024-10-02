@@ -1,7 +1,7 @@
 # @yaml
 # tdd: true
 # signature: tdd_repro ["<target_file>"] [<target_function_name>] [<decl_lineno>]
-# docstring: Reproduces the bug by running targeted tests.
+# docstring: Reproduces the bug by running bug-specific tests. Provide optional target arguments to get runtime context for the target function.
 # arguments:
 #  target_file:
 #     type: string
