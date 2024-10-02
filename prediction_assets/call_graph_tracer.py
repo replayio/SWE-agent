@@ -13,9 +13,6 @@ from json.decoder import JSONDecodeError
 from types import FrameType, TracebackType
 from typing import Callable, Dict, List, Optional, Union  # noqa: UP035
 
-# REPO_ROOT = os.environ.get("REPO_ROOT") or os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-# INSTANCE_NAME = os.environ.get("TDD_INSTANCE_NAME")
-
 TargetConfig = Dict[str, Union[Optional[str], Optional[int]]]
 
 def parse_json(json_string):
@@ -63,6 +60,10 @@ if TRACE_TARGET_CONFIG_STR:
 # Record parameter values and return values, only if target region is sufficiently scoped.
 RECORD_VALUES = not not TRACE_TARGET_CONFIG
 
+MUTE_EXCEPTIONS = False
+
+# REPO_ROOT = os.environ.get("REPO_ROOT") or os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+# INSTANCE_NAME = os.environ.get("TDD_INSTANCE_NAME")
 
 
 class FrameInfo:
@@ -82,7 +83,7 @@ class FrameInfo:
         self.decl_lineno = decl_lineno or (frame.f_code.co_firstlineno if frame else None)
 
         self.call_filename = call_filename or (frame.f_back.f_code.co_filename if frame and frame.f_back else None)
-        self.call_lineno = call_lineno or (frame.f_back.f_lineno if frame else None)
+        self.call_lineno = self.call_lineno = call_lineno or (frame.f_back.f_lineno if frame and frame.f_back else None)
 
         self.function_name = function_name or (frame.f_code.co_name if frame else None)
         self.code_context = code_context
@@ -309,6 +310,9 @@ class CallGraph:
                         self.print_graph_on_exception("EXCEPTION", test_node)
             return self.trace_calls
         except Exception:
+            if not MUTE_EXCEPTIONS:
+                print("\n\n\nERROR IN trace_calls:\n\n\n")
+                traceback.print_exc()
             return None
 
     def find_node(self, target_config: TargetConfig) -> Optional[CallGraphNode]:
@@ -412,8 +416,9 @@ class CallGraph:
                     if full_stack:
                         self.print_graph_on_exception("FUTURE_DONE_CALLBACK", full_stack[0])
                 except Exception:
-                    print("\n\n\nERROR IN exception_handler:\n\n\n")
-                    traceback.print_exc()
+                    if not MUTE_EXCEPTIONS:
+                        print("\n\n\nERROR IN task_done_callback:\n\n\n")
+                        traceback.print_exc()
 
 
 def register_runtime_trace():
@@ -489,8 +494,9 @@ def exception_handler(exc_type, exc_value, exc_traceback):
             if nodes:
                 _current_graph.print_graph_on_exception("UNCAUGHT_EXCEPTION_HANDLER", nodes[0])
     except Exception:
-        print("\n\n\nERROR IN exception_handler:\n\n\n")
-        traceback.print_exc()
+        if not MUTE_EXCEPTIONS:
+            print("\n\n\nERROR IN exception_handler:\n\n\n")
+            traceback.print_exc()
     sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
 
