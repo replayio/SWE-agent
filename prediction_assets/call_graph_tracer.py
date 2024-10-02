@@ -11,15 +11,12 @@ import threading
 import traceback
 from json.decoder import JSONDecodeError
 from types import FrameType, TracebackType
-from typing import Callable, Dict, List, Optional, TypedDict  # noqa: UP035
+from typing import Callable, Dict, List, Optional, Union  # noqa: UP035
 
 # REPO_ROOT = os.environ.get("REPO_ROOT") or os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 # INSTANCE_NAME = os.environ.get("TDD_INSTANCE_NAME")
 
-class TargetConfig(TypedDict):
-    file: Optional[str]
-    function_name: Optional[str]
-    decl_lineno: Optional[int]
+TargetConfig = Dict[str, Union[Optional[str], Optional[int]]]
 
 def parse_json(json_string):
     try:
@@ -85,7 +82,7 @@ class FrameInfo:
         self.decl_lineno = decl_lineno or (frame.f_code.co_firstlineno if frame else None)
 
         self.call_filename = call_filename or (frame.f_back.f_code.co_filename if frame and frame.f_back else None)
-        self.call_lineno = call_lineno or (frame.f_lineno if frame else None)
+        self.call_lineno = call_lineno or (frame.f_back.f_lineno if frame else None)
 
         self.function_name = function_name or (frame.f_code.co_name if frame else None)
         self.code_context = code_context
@@ -218,9 +215,9 @@ class CallGraphNode(BaseNode):
             return "  " * level + "[Recursion]\n"
         visited.add(id(self))
         indent = "  " * level
-        result = f"{indent}{self.name}" + f" [decl: {self.decl_filename}:{self.frame_info.decl_lineno}"
+        result = f"{indent}{self.name}" + f" [decl: {self.decl_filename or '?'}:{self.frame_info.decl_lineno or '?'}"
         if self.frame_info.call_lineno != self.frame_info.decl_lineno:
-            result += f", called from: {self.call_filename or '?'}:{self.frame_info.call_lineno or '?'}"
+            result += f", called_from: {self.call_filename or '?'}:{self.frame_info.call_lineno or '?'}"
         result += "]"
         if RECORD_VALUES:
             if self.parameters:
@@ -263,11 +260,11 @@ class CallGraph:
         res: List[CallGraphNode] = call_stack.copy()
         return res
 
-    def trace_calls(self, frame: FrameType, event: str, arg: any) -> Optional[Callable]:
+    def trace_calls(self, event_frame: FrameType, event: str, arg: any) -> Optional[Callable]:
         try:
-            frame_info = FrameInfo.from_frame(frame)
+            frame_info = FrameInfo.from_frame(event_frame)
 
-            if not self.should_trace(frame):
+            if not self.should_trace(event_frame):
                 return None
             if event == "call":
                 call_stack = self.access_call_stack()
@@ -283,7 +280,7 @@ class CallGraph:
                     self.root = node
                 call_stack.append(node)
                 self.call_stack.set(call_stack)
-                frame.f_trace = self.trace_calls
+                event_frame.f_trace = self.trace_calls
             elif event == "return":
                 call_stack = self.access_call_stack()
                 if call_stack:
@@ -298,19 +295,18 @@ class CallGraph:
                 call_stack = self.access_call_stack()
                 if call_stack:
                     call_stack[-1].set_exception(exc_type.__name__)
-                    if frame.f_back is None or frame_info.function_name.startswith("test_"):
-                        root_node = (
-                            next(
-                                (
-                                    node
-                                    for node in reversed(call_stack)
-                                    if node.name == frame_info.function_name and node.decl_filename == frame_info.decl_filename
-                                ),
-                                None,
-                            )
-                            or call_stack[-1]
+                    test_node = (
+                        next(
+                            (
+                                node
+                                for node in reversed(call_stack)
+                                if node.name.startswith("test_")
+                            ),
+                            None,
                         )
-                        self.print_graph_on_exception("EXCEPTION", root_node)
+                    )
+                    if test_node:
+                        self.print_graph_on_exception("EXCEPTION", test_node)
             return self.trace_calls
         except Exception:
             return None
