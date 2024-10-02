@@ -9,8 +9,16 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__))))
 module = importlib.import_module("call_graph_tracer")
 module.register_runtime_trace()
 
+
+class A:
+    class B:
+        @classmethod
+        def my_method(cls):
+            print("A.B.my_method")
+
 def function_a():
     print("Function A")
+    A().B.my_method()
     function_b()
     function_b2()
 
