@@ -1,3 +1,6 @@
+# noqa: I002
+# ruff: noqa: UP006
+
 import json  # noqa: I002
 import os
 import sys
@@ -54,7 +57,7 @@ else:
 
 class BaseNode:
     def __init__(self):
-        self.children: List['BaseNode'] = []
+        self.children: List[BaseNode] = []
 
     def add_child(self, child: 'BaseNode'):
         self.children.append(child)
@@ -174,7 +177,7 @@ class CallGraph:
                 return abs_filename.startswith(self.cwd)
             else:
                 return True
-        except Exception as err:
+        except Exception:
             # TODO: cannot quite unmute this quite yet, because it triggers at the end of every test run due to weird shit happening during teardown.
             # print("\n\n\nERROR IN should_trace:\n\n\n")
             # traceback.print_exc()
@@ -244,7 +247,7 @@ class CallGraph:
                         self.print_graph_on_exception("EXCEPTION", root_node)
                         # self.store()  # Store the call graph when an exception occurs
             return self.trace_calls
-        except Exception as err:
+        except Exception:
             # TODO: cannot quite unmute this quite yet, because it triggers at the end of every test run due to weird shit happening during teardown.
             # print("\n\n\nERROR IN trace_calls:\n\n\n")
             # traceback.print_exc()
@@ -319,7 +322,7 @@ class CallGraph:
     @classmethod
     def load(cls, root_name: str) -> 'CallGraph':
         filepath = make_file_path(root_name)
-        with open(filepath, 'r') as f:
+        with open(filepath) as f:
             data = json.load(f)
 
         tracer = cls()
@@ -364,7 +367,7 @@ class CallGraph:
                         full_stack[i].add_child(full_stack[i + 1])
                     if full_stack:
                         self.print_graph_on_exception("FUTURE_DONE_CALLBACK", full_stack[0])
-                except Exception as err:
+                except Exception:
                     print("\n\n\nERROR IN exception_handler:\n\n\n")
                     traceback.print_exc()
 
@@ -435,7 +438,7 @@ def exception_handler(exc_type, exc_value, exc_traceback):
             if nodes:
                 _current_graph.print_graph_on_exception("UNCAUGHT_EXCEPTION_HANDLER", nodes[0])
                 # _current_graph.store()  # Store the call graph when an uncaught exception occurs
-    except Exception as err:
+    except Exception:
         print("\n\n\nERROR IN exception_handler:\n\n\n")
         traceback.print_exc()
     sys.__excepthook__(exc_type, exc_value, exc_traceback)
