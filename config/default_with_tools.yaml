@@ -14,7 +14,6 @@ instance_template: |-
   {issue}
   </ISSUE_DESCRIPTION>
 
-  {tdd_results}
   # COMMAND/TOOL INSTRUCTIONS
   * YOU CAN ONLY MAKE ONE TOOL CALL ("COMMAND") AT A TIME. You should always wait for feedback after every command.
   * You can write scripts and run them. E.g. you can write a python script and then run it with `python <script_name>.py`.
@@ -57,7 +56,6 @@ instance_template: |-
     3. ...
   * Thoughts: <YOUR_THOUGHTS/>
   </CALL_GRAPH_ANALYSIS_TEMPLATE>
-
 
   (Open file: {open_file})
   (Current directory: {working_dir})

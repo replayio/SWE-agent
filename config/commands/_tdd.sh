@@ -28,6 +28,12 @@ tdd_repro() {
         export TDD_TRACE_TARGET_CONFIG="{ \"target_file\": \"$1\", \"target_function_name\": \"$2\", \"decl_lineno\": $line_no}"
     fi
     eval "$TEST_CMD_FAIL_TO_PASS"
+
+    # include the continuation file if it exists
+    if [ -f "$MANUAL_INPUT_CONTINUATION_FILE" ]; then
+        cat $MANUAL_INPUT_CONTINUATION_FILE
+        rm $MANUAL_INPUT_CONTINUATION_FILE
+    fi
     popd > /dev/null
 }
 
