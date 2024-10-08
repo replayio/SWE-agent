@@ -285,6 +285,13 @@ class SWEEnv(gym.Env):
                 timeout_duration=LONG_TIMEOUT,
             )
         return self._repo_name
+    
+    def _write_cached_image(self):
+        self.communicate("env >> /.env")
+        assert self.container_obj is not None  # mypy
+        cached_image_name = self._get_cached_task_image_name()
+        self.container_obj.commit(cached_image_name)
+        self.logger.info(f"Container with environment {self.container_obj.id} cached as image {cached_image_name}")
 
     def reset(self, index: int | None = None) -> tuple[str | None, dict]:
         """
@@ -326,6 +333,10 @@ class SWEEnv(gym.Env):
                 self.communicate("export $(xargs </.env)")
 
                 self.init_container_prebake()
+
+                # # Overwrite image with new prebake settings.
+                # self._write_cached_image()
+
                 self.init_container_postbake()
 
                 return None, info
@@ -392,10 +403,7 @@ class SWEEnv(gym.Env):
         self.init_container_prebake()
 
         if self.args.cache_task_images:
-            self.communicate("env >> /.env")
-            assert self.container_obj is not None  # mypy
-            self.container_obj.commit(cached_image_name)
-            self.logger.info(f"Container with environment {self.container_obj.id} cached as image {cached_image_name}")
+            self._write_cached_image()
 
         self.init_container_postbake()
 
@@ -480,7 +488,10 @@ class SWEEnv(gym.Env):
         return "/root/test.patch"
 
     def _prepare_test_patch(self):
-        self.copy_string_to_container_file(self.record["test_patch"], self._container_patch_path)
+        ln = "\n"
+        patch = self.record["test_patch"]
+        self.logger.debug(f"Preparing patch at {self._container_patch_path}:{ln}{ln}{patch}")
+        self.copy_string_to_container_file(patch, self._container_patch_path)
 
 
     def _apply_test_patch(self):
