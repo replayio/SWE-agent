@@ -23,7 +23,7 @@ python3 run.py \
   --model_name "claude-sonnet-3.5" \
   --data_path "princeton-nlp/SWE-bench_Verified" \
   --config_file "./config/default_with_tools.yaml" \
-  --per_instance_cost_limit 4.00 \
+  --per_instance_cost_limit 2.00 \
   --split "test" \
   --instance_filter "$1" \
   --skip_existing False \
