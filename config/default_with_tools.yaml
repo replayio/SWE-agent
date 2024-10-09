@@ -1,11 +1,6 @@
 system_template: |-
   # BACKGROUND
-  You are an autonomous programmer, and you're working directly in the command line with a special interface.
-  The special interface consists of a file editor that shows you {WINDOW} lines of a file at a time.
-  In addition to typical bash commands, you can also use the given commands (tools) to help you navigate and edit files.
-
-  # RESPONSE FORMAT
-  At every iteration, you should only call a *SINGLE* tool. Don't issue two tool calls at once.
+  * Help solve the issue reported by the user.
 
 instance_template: |-
   # ISSUE
@@ -14,48 +9,18 @@ instance_template: |-
   {issue}
   </ISSUE_DESCRIPTION>
 
-  # COMMAND/TOOL INSTRUCTIONS
+  # Command/Tool Instructions
   * YOU CAN ONLY MAKE ONE TOOL CALL ("COMMAND") AT A TIME. You should always wait for feedback after every command.
-  * You can write scripts and run them. E.g. you can write a python script and then run it with `python <script_name>.py`.
-  * Don't use any interactive session commands (e.g. python, vim) in this environment.
   * WARNING: Indentation matters! When editing a file, make sure to insert appropriate indentation before each line!
-  * Once you have verified that you have solved the problem (or unable to make progress), you must call the final `submit` command.
   * If you open a file and need to get to an area around a specific line that is not in the first 100 lines, say line 583, don't just use the scroll_down command multiple times. Instead, use the goto 583 command. It's much quicker.
   * When editing files, it is easy to accidentally specify a wrong line number or to write code with incorrect indentation. Always check the code after you issue an edit to make sure that it reflects what you wanted to accomplish. If it didn't, issue another command to fix it.
+  * Once you have verified that you have solved the problem (or unable to make progress), you must call the final `submit` command.
 
-  # PROBLEM SOLVING STRATEGY
+  # Problem Solving Strategy
   1. Always make sure to look at the current open file and the CWD. The currently open file might be in a different directory than the working directory! Note that some commands, such as 'create', open files, so they might change the current open file.
   2. CWD is the directory of the repo you are supposed to edit. Only modify files inside this directory. Always provide absolute file paths, prefixed with $PWD.  
-  3. ALWAYS make sure to first investigate the dynamic call graph. HEED THE "OUTPUT TEMPLATE" instructions.
-
-  # OUTPUT TEMPLATE
-  At every step:
-  
-  * For every function you are investigating, first run `tdd_repro <TARGET_FILE/> <TARGET_FUNCTION_NAME/>` to get targeted runtime data for each FUNCTION YOU ARE INVESTIGATING. Don't look at the code OF ANY FUNCTION before you have done this step. You must do this FOR EVERY FUNCTION, not just the test function.
-  * In a follow-up message fill in the following analysis template for your investigation of the resulting CALL_GRAPH_ON_EXCEPTION for TARGET_FUNCTION_NAME:
-  
-  <CALL_GRAPH_ANALYSIS_TEMPLATE>
-  Investigation update:
-  * Target: <TARGET/> <!--NOTE: an investigation target is generally a function or a piece of code. Provide its (ideally qualified) name or give it a title, if it has no name.-->
-  * DYNAMIC_CALL_GRAPH:
-    * Caller: <CALLER/> <!--NOTE: the caller is the function that calls the target function.-->
-    * Children Count: <COUNT_OF_ALL_CHILDREN/>
-    * Children of interest: <CHILDREN_OF_INTEREST/>
-  * Goal: <CURRENT_GOAL_OF_INVESTIGATION/>
-  * <TARGET/>'s children based on CALL_GRAPH_ON_EXCEPTION:
-    * <!--NOTE: List all children of <TARGET/> from DYNAMIC_CALL_GRAPH.-->
-    * <!--NOTE: If you have seen the code for that child, provide information on how this call and its parameters might relate to the bug.-->
-    1. <CHILD_1><LOC_1/>: <EXPLANATION_1/>
-       <IF YOU_CAN_SEE LOC_1>
-       * <SUSPICIOUS_PARAMETERS_FOR_CHILD1/>
-       </IF YOU_CAN_SEE LOC_1></CHILD_1>
-    2. <CHILD_2><LOC_2/>: <EXPLANATION_2/>
-       <IF YOU_CAN_SEE LOC_2>
-       * <SUSPICIOUS_PARAMETERS_FOR_CHILD2/>
-       </IF YOU_CAN_SEE LOC_2></CHILD_2>
-    3. ...
-  * Thoughts: <YOUR_THOUGHTS/>
-  </CALL_GRAPH_ANALYSIS_TEMPLATE>
+  3. Help diagnose and find the root cause by applying program analysis strategically using a time-travel debugger.
+  4. YOU MUST primarily use a slicing algorithm to traverse the dynamic dependency graph, based on previously found evidence. Every step should be based on the existing dynamic slice that you already have access to.
 
   (Open file: {open_file})
   (Current directory: {working_dir})
