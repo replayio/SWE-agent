@@ -1,12 +1,13 @@
-# Our re-organized logs.
+# Our re-organized logs
 sanitized_logs
-investigation-data
+/investigation-data
+
 _backup/**
 
-# their logs.
+# their logs
 logs
-trajectories/**
 !trajectories/demonstrations/**
+trajectories/**
 
 
 # Other
@@ -15,6 +16,8 @@ service-account-key.json
 **/investigations/investigation-data
 **/investigations/run-logs*
 *~
+/*.log
+*tmp.log*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -74,7 +77,6 @@ coverage.xml
 *.pot
 
 # Django stuff:
-*.log
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
