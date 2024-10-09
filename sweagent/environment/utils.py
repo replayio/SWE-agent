@@ -227,13 +227,15 @@ def read_with_timeout_experimental(container: subprocess.Popen, timeout_duration
         if ready_to_read(fd):
             try:
                 data = os.read(fd, 4096)
-            except BlockingIOError:
+            except BlockingIOError as err:
                 logger.error("BlockingIOError while reading from subprocess.", exc_info=True)
-                break
+                # break
+                raise err
             if data:
                 buffer += data
                 decoded = buffer.decode("utf-8", errors="backslashreplace")
-                if PROCESS_DONE_MARKER_START in decoded:
+                # if PROCESS_DONE_MARKER_START in decoded:
+                if PROCESS_DONE_REGEX.search(decoded):
                     break
         time.sleep(0.01)  # Prevents CPU hogging
 
