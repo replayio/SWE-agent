@@ -6,37 +6,48 @@ import sys
 import pandas as pd
 
 
+_swe_bench_data = None
+
 def get_swe_bench_data():
-    return pd.read_parquet("hf://datasets/princeton-nlp/SWE-bench_Verified/data/test-00000-of-00001.parquet")
+    # Keep it cached
+    global _swe_bench_data
+    if _swe_bench_data is None:
+        _swe_bench_data = pd.read_parquet("hf://datasets/princeton-nlp/SWE-bench_Verified/data/test-00000-of-00001.parquet")
+    return _swe_bench_data
+
 
 def truncate_string(text, max_length=100):
-    return (text[:max_length] + '...') if len(text) > max_length else text
+    return (text[:max_length] + "...") if len(text) > max_length else text
+
+def get_swe_bench_cell(instance_id: str, col: str):
+    return get_swe_bench_data().loc[get_swe_bench_data()["instance_id"] == instance_id, col].iloc[0]
 
 def get_swe_bench_instance_markdown(instance_id: str):
     # Get the DataFrame
     df = get_swe_bench_data()
-    
+
     # Select the specific row
-    specific_row = df[df['instance_id'] == instance_id]
-    
+    specific_row = df[df["instance_id"] == instance_id]
+
     if specific_row.empty:
         return "No data found for the given instance_id."
-    
+
     # Truncation
-    if 'PASS_TO_PASS' in specific_row.columns:
-       specific_row.loc[:, 'PASS_TO_PASS'] = specific_row['PASS_TO_PASS'].apply(truncate_string)
-    
+    if "PASS_TO_PASS" in specific_row.columns:
+        specific_row.loc[:, "PASS_TO_PASS"] = specific_row["PASS_TO_PASS"].apply(truncate_string)
+
     # Transpose the row
     transposed = specific_row.transpose()
-    
+
     # Reset the index to turn the column names into a regular column
     transposed = transposed.reset_index()
-    
+
     # Rename the columns
-    transposed.columns = ['Field', 'Value']
-    
+    transposed.columns = ["Field", "Value"]
+
     # Convert to Markdown
     return transposed.to_markdown(index=False)
+
 
 def generate_cached_image_id(instance_id: str, environment_setup: str = "no_setup") -> str:
     cached_image_prefix = "swe-agent-task-env-"
@@ -76,4 +87,3 @@ if __name__ == "__main__":
 
     result = generate_cached_image_id(instance_id, environment_setup)
     print(result)
-
