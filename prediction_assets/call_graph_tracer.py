@@ -159,23 +159,27 @@ def get_relative_filename(filename: str) -> str:
 class BaseNode:
     def __init__(self):
         self.children: List[BaseNode] = []
+        self.parent: Optional[CallGraphNode] = None
 
     def add_child(self, child: "BaseNode"):
         self.children.append(child)
         child.parent = self
+
+    def __str__(self, level=0, visited=None):
+        indent = "  " * level
+        return f"{indent}{self.name}\n"
+
+
+class LineNode(BaseNode):
+    def __init__(self, value: str):
+        super().__init__()
+        self.name = value
 
 
 class OmittedNode(BaseNode):
     def __init__(self):
         super().__init__()
         self.name = "(omitted child)"
-
-    def __str__(self, level=0, visited=None):
-        indent = "  " * level
-        return f"{indent}{self.name}\n"
-
-    def to_dict(self):
-        return {"name": self.name, "type": "OmittedNode"}
 
 
 class CallGraphNode(BaseNode):
@@ -188,7 +192,6 @@ class CallGraphNode(BaseNode):
         self.exception: Optional[str] = None
         self.parameters: Dict[str, any] = {}
         self.return_value: any = None
-        self.parent: Optional[CallGraphNode] = None
 
     @property
     def name(self) -> str:
@@ -265,6 +268,29 @@ class CallGraph:
         call_stack = self.call_stack.get()
         res: List[CallGraphNode] = call_stack.copy()
         return res
+    
+    def _trace_line(self, frame: FrameType, arg: any):
+        code = frame.f_code
+        # function_name = code.co_name
+        line_no = frame.f_lineno
+        filename = code.co_filename
+        
+        # Get the variables in the current frame
+        variables = frame.f_locals
+        
+        # Compare with the previous state to detect changes
+        if hasattr(frame, 'f_trace_lines'):
+            for var_name, var_value in variables.items():
+                if var_name not in frame.f_trace_lines or frame.f_trace_lines[var_name] != var_value:
+                    if "group_by" in var_name:
+                        # print(f"Assignment in {filename}, function {function_name}, line {line_no}:")
+                        line_str = f" [=]  {var_name} = {var_value} (at {filename}:{line_no})"
+                        call_stack = self.access_call_stack()
+                        if call_stack:
+                            call_stack[-1].add_child(LineNode(line_str))
+        
+        # Update the previous state
+        frame.f_trace_lines = variables.copy()
 
     def trace_calls(self, event_frame: FrameType, event: str, arg: any) -> Optional[Callable]:
         try:
@@ -307,6 +333,8 @@ class CallGraph:
                     )
                     if test_node:
                         self.print_graph_on_exception("EXCEPTION", test_node, exc_str)
+            elif event == "line":
+                self._trace_line(event_frame, arg)
             return self.trace_calls
         except Exception as err:
             if not MUTE_EXCEPTIONS:
