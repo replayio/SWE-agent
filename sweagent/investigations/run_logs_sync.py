@@ -16,23 +16,35 @@ class RunLogsSync(LocalPaths):
 
     def download_instance_prediction_run_log(self, instance_id: str):
         run_logs_folder_id = get_drive_file_id(DRIVE_REPRO_DATA_ROOT_FOLDER_ID, [self.run_name, "trajectories", SANITIZED_RUN_LOGS_FOLDER_NAME])
+        if run_logs_folder_id is None:
+            # should we raise an error here?
+            return []
         instance_file_name = get_instance_run_log_name(instance_id)
         return drive_download_files(run_logs_folder_id, f"name='{instance_file_name}'", self.get_prediction_run_log_path)
 
     def download_instance_prediction_trajectory_json(self, instance_id: str):
         folder_id = get_drive_file_id(DRIVE_REPRO_DATA_ROOT_FOLDER_ID, [self.run_name, "trajectories"])
+        if folder_id is None:
+            # should we raise an error here?
+            return []
         instance_file_name = f"{instance_id}.traj"
         return drive_download_files(folder_id, f"name='{instance_file_name}'", self.get_prediction_trajectories_path)
 
     def get_instance_eval_folder_href(self, instance_id: str):
         folder_id = get_drive_file_id(DRIVE_REPRO_DATA_ROOT_FOLDER_ID, [self.run_name, "evaluation_logs", instance_id])
+        if folder_id is None:
+            # should we raise an error here?
+            return []
         return get_google_drive_folder_href(folder_id)
 
     def download_eval_instance_patch(self, instance_id: str):
         folder_id = get_drive_file_id(DRIVE_REPRO_DATA_ROOT_FOLDER_ID, [self.run_name, "evaluation_logs", instance_id])
+        if folder_id is None:
+            # should we raise an error here?
+            return []
         file_name = "patch.diff"
         def local_path_fn(_fname: str) -> str:
-            return self.get_local_run_path(f"{instance_id}-patch.diff")
+            return self.get_run_path(f"{instance_id}-patch.diff")
         return drive_download_files(folder_id, f"name='{file_name}'", local_path_fn)
     
     def download_entire_run(self):
