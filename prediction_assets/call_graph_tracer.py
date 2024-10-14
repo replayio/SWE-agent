@@ -5,15 +5,22 @@
 
 import inspect
 import json  # noqa: I002
+import linecache
 import os
 import sys
 import threading
 import traceback
 from json.decoder import JSONDecodeError
 from types import FrameType, TracebackType
-from typing import Callable, Dict, List, Optional, Union, Any  # noqa: UP035
+from typing import Any, Callable, Dict, List, Optional, Union
+
+from tests.prediction_assets.use_tracer import register_call_graph
 
 TargetConfig = Dict[str, Union[Optional[str], Optional[int]]]
+
+# ############################################################################
+# parse_json util
+# ############################################################################
 
 
 def parse_json(json_string):
@@ -48,7 +55,11 @@ def parse_json(json_string):
         raise ValueError(error_msg) from e
 
 
-# Parse config.
+# ############################################################################
+# Config
+# ############################################################################
+
+# Parse target config.
 TRACE_TARGET_CONFIG_STR = os.environ.get("TDD_TRACE_TARGET_CONFIG")
 TRACE_TARGET_CONFIG: Optional[TargetConfig] = None
 if TRACE_TARGET_CONFIG_STR:
@@ -61,14 +72,32 @@ if TRACE_TARGET_CONFIG_STR:
                 "TDD_TRACE_TARGET_CONFIG must provide 'target_function_name' if 'target_file' is provided."
             )
 
+# Whether to only report call graphs on assert failures
+ASSERTS_ONLY = True
+
 # Record parameter values and return values, only if target region is sufficiently scoped.
 RECORD_VALUES = not not TRACE_TARGET_CONFIG
+RECORD_PARAMS = True
+RECORD_RETURN_VALUES = True
 
 # NOTE: We need to mute exceptions because some of them get thrown during teardown where builtins are straight up gone.
 MUTE_EXCEPTIONS = True
 
+DO_STRINGIFY = True
+
+# OVERRIDES
+RECORD_VALUES = True
+# RECORD_PARAMS = False
+MUTE_EXCEPTIONS = False
+DO_STRINGIFY = False
+
 # REPO_ROOT = os.environ.get("REPO_ROOT") or os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 # INSTANCE_NAME = os.environ.get("TDD_INSTANCE_NAME")
+
+
+# ############################################################################
+# FrameInfo
+# ############################################################################
 
 
 class FrameInfo:
@@ -126,6 +155,10 @@ class FrameInfo:
         return self.frame.f_locals
 
 
+# ############################################################################
+# Polyfill stuff
+# ############################################################################
+
 python_version = sys.version_info
 
 # Compatibility for ContextVar
@@ -145,6 +178,11 @@ else:
             setattr(self.local, "value", value)
 
 
+# ############################################################################
+# util
+# ############################################################################
+
+
 def get_relative_filename(filename: str) -> str:
     try:
         rel_path = os.path.relpath(filename)
@@ -154,6 +192,52 @@ def get_relative_filename(filename: str) -> str:
             return rel_path
     except Exception:
         return filename
+
+
+# ############################################################################
+# CallGraphNode + Object and Value tracking
+# ############################################################################
+
+
+class ObjectTracker:
+    def __init__(self):
+        self.object_id_counter = 0
+        self.object_ids = {}
+
+    def get_object_id(self, obj: Any) -> int:
+        if id(obj) not in self.object_ids:
+            self.object_id_counter += 1
+            self.object_ids[id(obj)] = self.object_id_counter
+        return self.object_ids[id(obj)]
+
+
+object_tracker = ObjectTracker()
+
+
+def stringify_with_ref(value: Any) -> str:
+    if isinstance(value, (int, float, str, bool, type(None))):
+        if DO_STRINGIFY:
+            return str(value)
+        return f"({type(value).__name__})"
+
+    obj_id = object_tracker.get_object_id(value)
+    if DO_STRINGIFY:
+        stringified = ": "
+        try:
+            stringified = str(value)
+        except Exception as e:
+            stringified = f"(Error when stringifying: {e})"
+    else:
+        stringified = ""
+
+    return f"REF#{obj_id}{stringified}"
+
+
+def stringify_dict(d: Dict[str, Any]) -> str:
+    result = {}
+    for key, value in d.items():
+        result[key] = stringify_with_ref(value)
+    return str(result)
 
 
 class BaseNode:
@@ -208,13 +292,15 @@ class CallGraphNode(BaseNode):
     def set_exception(self, exc_name: str):
         self.exception = exc_name
 
-    def set_parameters(self, params: Dict[str, any]):
-        if RECORD_VALUES:
-            self.parameters = params
+    def set_parameters(self, params: Dict[str, Any]):
+        if not RECORD_VALUES or not RECORD_PARAMS:
+            return
+        self.parameters = stringify_dict(params)
 
-    def set_return_value(self, value: any):
-        if RECORD_VALUES:
-            self.return_value = value
+    def set_return_value(self, value: Any):
+        if not RECORD_VALUES or not RECORD_RETURN_VALUES:
+            return
+        self.return_value = stringify_with_ref(value)
 
     def __str__(self, level=0, visited=None):
         if visited is None:
@@ -227,15 +313,19 @@ class CallGraphNode(BaseNode):
         if self.frame_info.call_lineno != self.frame_info.decl_lineno:
             result += f", called_from: {self.call_filename or '?'}:{self.frame_info.call_lineno or '?'}"
         result += "]"
-        if RECORD_VALUES:
-            if self.parameters:
-                result += f", Parameters:{self.parameters}"
-            if self.return_value is not None:
-                result += f", ReturnValue:{self.return_value}"
+        if self.parameters:
+            result += f", Parameters:{self.parameters}"
+        if self.return_value is not None:
+            result += f", ReturnValue:{self.return_value}"
         result += "\n"
         for child in self.children:
             result += child.__str__(level + 1, visited)
         return result
+
+
+# ############################################################################
+# CallGraph impl
+# ############################################################################
 
 
 class CallGraph:
@@ -253,8 +343,8 @@ class CallGraph:
             # Ignore code without code or filename.
             # TODO: Not sure why frames can have no code or filename. Might be some builtins?
             return False
-        if frame.f_code.co_filename == __file__:
-            # Ignore the trace code itself.
+        if os.path.dirname(frame.f_code.co_filename) == os.path.dirname(__file__):
+            # Ignore all code from within this directory.
             return False
         filename = frame.f_code.co_filename
         abs_filename = os.path.abspath(filename)
@@ -268,29 +358,31 @@ class CallGraph:
         call_stack = self.call_stack.get()
         res: List[CallGraphNode] = call_stack.copy()
         return res
-    
-    def _trace_line(self, frame: FrameType, arg: any):
+
+    def trace_line(self, frame: FrameType, arg: any):
         code = frame.f_code
-        # function_name = code.co_name
-        line_no = frame.f_lineno
+        function_name = code.co_name
+        lineno = frame.f_lineno
         filename = code.co_filename
-        
+        line_of_code = linecache.getline(filename, lineno).strip()
+
         # Get the variables in the current frame
         variables = frame.f_locals
-        
-        # Compare with the previous state to detect changes
-        if hasattr(frame, 'f_trace_lines'):
-            for var_name, var_value in variables.items():
-                if var_name not in frame.f_trace_lines or frame.f_trace_lines[var_name] != var_value:
-                    if "group_by" in var_name:
-                        # print(f"Assignment in {filename}, function {function_name}, line {line_no}:")
-                        line_str = f" [=]  {var_name} = {var_value} (at {filename}:{line_no})"
-                        call_stack = self.access_call_stack()
-                        if call_stack:
-                            call_stack[-1].add_child(LineNode(line_str))
-        
-        # Update the previous state
-        frame.f_trace_lines = variables.copy()
+
+        code_query = "_iterable_class"
+        if code_query in line_of_code:
+            # print(f"CODE: {line_of_code}", file=sys.stderr)
+            # for var_name, var_value in variables.items():
+            #     print(f"  DDBG Assignment on {var_name}", file=sys.stderr)
+            #     if "_result_cache" in var_name:
+            #         print(f"DDBG Assignment in {filename}, function {function_name}, line {lineno}:", file=sys.stderr)
+            node_str = f"CODE_EXECUTED: `{line_of_code} (at {filename}:{lineno})`"
+            self.append_to_current_node(node_str)
+
+    def append_to_current_node(self, s: str):
+        call_stack = self.access_call_stack()
+        if call_stack:
+            call_stack[-1].add_child(LineNode(s))
 
     def trace_calls(self, event_frame: FrameType, event: str, arg: any) -> Optional[Callable]:
         try:
@@ -331,15 +423,15 @@ class CallGraph:
                         (node for node in reversed(call_stack) if node.name.startswith("test_")),
                         None,
                     )
-                    if test_node:
-                        self.print_graph_on_exception("EXCEPTION", test_node, exc_str)
+                    if test_node and (not ASSERTS_ONLY or exc_type is AssertionError):
+                        self.print_graph_on_exception("EXCEPTION", test_node, exc_str, exc_type)
             elif event == "line":
-                self._trace_line(event_frame, arg)
+                self.trace_line(event_frame, arg)
             return self.trace_calls
         except Exception as err:
             if not MUTE_EXCEPTIONS:
-                print("\n\n\nERROR IN trace_calls:\n\n\n")
-                traceback.print_exc()
+                print("\n\n\nERROR IN trace_calls:\n\n\n", file=sys.stderr)
+            traceback.print_exc()
             return None
 
     def find_node(self, target_config: TargetConfig) -> Optional[CallGraphNode]:
@@ -401,7 +493,9 @@ class CallGraph:
 
         return root
 
-    def print_graph_on_exception(self, cause: str, node: BaseNode, exception_details: Optional[Any]):
+    def print_graph_on_exception(
+        self, cause: str, node: BaseNode, exception_details: Optional[Any], exc_type: Optional[Any]
+    ):
         try:
             result: str = None
             if TRACE_TARGET_CONFIG:
@@ -422,15 +516,19 @@ class CallGraph:
                 partial_info = ""
                 result = str(node)
 
-            print("\n\n" + f"<EXCEPTION_EVENT origin='{cause}'>", file=sys.stderr)
-            if exception_details:
-                print("<EXCEPTION_DETAILS>\n" + str(exception_details) + "\n</EXCEPTION_DETAILS>", file=sys.stderr)
+            ln = "\n"
+            print(f"{ln}{ln}<EXCEPTION_EVENT origin='{cause}'>", file=sys.stderr)
+            if exception_details or exc_type:
+                print(
+                    f"<EXCEPTION_DETAILS>{ln}{str(exc_type)}{ln}{str(exception_details)}{ln}</EXCEPTION_DETAILS>",
+                    file=sys.stderr,
+                )
             print(f"<CALL_GRAPH_ON_EXCEPTION{partial_info}>", file=sys.stderr)
             print(result, file=sys.stderr)
             print("</CALL_GRAPH_ON_EXCEPTION>", file=sys.stderr)
             print("</EXCEPTION_EVENT>", file=sys.stderr)
         except Exception as err:
-            print(f"INTERNAL ERROR when printing EXCEPTION_EVENT: {err}")
+            print(f"INTERNAL ERROR when printing EXCEPTION_EVENT: {err}", file=sys.stderr)
 
     if python_version >= (3, 7):
 
@@ -458,13 +556,19 @@ class CallGraph:
                         self.print_graph_on_exception("FUTURE_DONE_CALLBACK", full_stack[0])
                 except Exception:
                     if not MUTE_EXCEPTIONS:
-                        print("\n\n\nERROR IN task_done_callback:\n\n\n")
+                        print("\n\n\nERROR IN task_done_callback:\n\n\n", file=sys.stderr)
                         traceback.print_exc()
+
+
+# ############################################################################
+# register_runtime_trace
+# ############################################################################
 
 
 def register_runtime_trace():
     global _current_graph
     _current_graph = CallGraph()
+    register_call_graph(_current_graph)
     sys.settrace(_current_graph.trace_calls)
     threading.settrace(_current_graph.trace_calls)
 
@@ -513,6 +617,10 @@ def register_runtime_trace():
 
 _current_graph = None
 
+# ############################################################################
+# exception_handler
+# ############################################################################
+
 
 def exception_handler(exc_type, exc_value, exc_traceback):
     try:
@@ -536,7 +644,7 @@ def exception_handler(exc_type, exc_value, exc_traceback):
                 _current_graph.print_graph_on_exception("UNCAUGHT_EXCEPTION_HANDLER", nodes[0])
     except Exception:
         if not MUTE_EXCEPTIONS:
-            print("\n\n\nERROR IN exception_handler:\n\n\n")
+            print("\n\n\nERROR IN exception_handler:\n\n\n", file=sys.stderr)
             traceback.print_exc()
     sys.__excepthook__(exc_type, exc_value, exc_traceback)
 

@@ -60,7 +60,7 @@ def summarize_instance(instance_id: str):
         run_data.append(f"""
 ### {run_name}
 
-* [PR Link]({make_bug_href(instance_id)})
+* [Golden Patch Link]({make_bug_href(instance_id)})
 * Prediction
   * [Run Log]({make_relative_path(prediction_run_logs)})
   * [Trajectory json]({make_relative_path(prediction_trajectories)})
