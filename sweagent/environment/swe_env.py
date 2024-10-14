@@ -488,9 +488,7 @@ class SWEEnv(gym.Env):
         return "/root/test.patch"
 
     def _prepare_test_patch(self):
-        ln = "\n"
         patch = self.record["test_patch"]
-        self.logger.debug(f"Preparing patch at {self._container_patch_path}:{ln}{ln}{patch}")
         self.copy_string_to_container_file(patch, self._container_patch_path)
 
 
