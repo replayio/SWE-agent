@@ -83,17 +83,23 @@ RECORD_RETURN_VALUES = True
 # NOTE: We need to mute exceptions because some of them get thrown during teardown where builtins are straight up gone.
 MUTE_EXCEPTIONS = True
 
+# Whether to print stringify parameter and return values.
+# If set to `False`, will only print primitive values and for objects only a reference id.
 DO_STRINGIFY = True
+
+MAX_PRINTED_CALL_GRAPHS = 3
 
 # OVERRIDES
 RECORD_VALUES = True
 # RECORD_PARAMS = False
 MUTE_EXCEPTIONS = False
 DO_STRINGIFY = False
+MAX_PRINTED_CALL_GRAPHS = 1
 
 # REPO_ROOT = os.environ.get("REPO_ROOT") or os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 # INSTANCE_NAME = os.environ.get("TDD_INSTANCE_NAME")
 
+_n_printed_call_graphs = 0
 
 # ############################################################################
 # FrameInfo
@@ -371,18 +377,13 @@ class CallGraph:
 
         code_query = "_iterable_class"
         if code_query in line_of_code:
-            # print(f"CODE: {line_of_code}", file=sys.stderr)
-            # for var_name, var_value in variables.items():
-            #     print(f"  DDBG Assignment on {var_name}", file=sys.stderr)
-            #     if "_result_cache" in var_name:
-            #         print(f"DDBG Assignment in {filename}, function {function_name}, line {lineno}:", file=sys.stderr)
             node_str = f"CODE_EXECUTED: `{line_of_code} (at {filename}:{lineno})`"
             self.append_to_current_node(node_str)
 
     def append_to_current_node(self, s: str):
         call_stack = self.access_call_stack()
         if call_stack:
-            call_stack[-1].add_child(LineNode(s))
+            call_stack[-1].add_child(LineNode(f'"{s}"'))
 
     def trace_calls(self, event_frame: FrameType, event: str, arg: any) -> Optional[Callable]:
         try:
@@ -496,6 +497,10 @@ class CallGraph:
     def print_graph_on_exception(
         self, cause: str, node: BaseNode, exception_details: Optional[Any], exc_type: Optional[Any]
     ):
+        global _n_printed_call_graphs
+        if _n_printed_call_graphs >= MAX_PRINTED_CALL_GRAPHS:
+            return
+        _n_printed_call_graphs += 1
         try:
             result: str = None
             if TRACE_TARGET_CONFIG:
