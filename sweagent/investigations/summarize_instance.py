@@ -5,7 +5,7 @@ import subprocess
 import sys
 from argparse import ArgumentParser
 
-from sweagent.investigations.instance_data import get_swe_bench_instance_markdown
+from sweagent.investigations.instance_data import get_swe_bench_cell, get_swe_bench_instance_markdown
 from sweagent.investigations.run_logs_sync import RunLogsSync
 
 investigation_data_folder_name = "investigation-data"
@@ -60,7 +60,7 @@ def summarize_instance(instance_id: str):
         run_data.append(f"""
 ### {run_name}
 
-* [PR Link]({make_bug_href(instance_id)})
+* [Golden Patch Link]({make_bug_href(instance_id)})
 * Prediction
   * [Run Log]({make_relative_path(prediction_run_logs)})
   * [Trajectory json]({make_relative_path(prediction_trajectories)})
@@ -82,6 +82,14 @@ def summarize_instance(instance_id: str):
 ## Bug Data
 
 {get_swe_bench_instance_markdown(instance_id)}
+
+### test_patch
+
+Copy-and-pasteable version of the test patch:
+
+```patch
+{get_swe_bench_cell(instance_id, "test_patch")}
+```
 
 """.strip()
 #   * {f"[Evaluation Results Folder]({eval_folder_href})" if eval_folder_href else "(no evaluation found)"}
