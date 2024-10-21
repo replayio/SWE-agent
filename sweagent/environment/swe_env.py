@@ -448,12 +448,13 @@ class SWEEnv(gym.Env):
                 container_test_folder
             )
 
-            # Inject test injecter:
-            # TODO: generalize the file location
-            #   (Choosing urls.py is a hack: we know that `urls.py` is one of the dynamic imports from runtests.py, so appending to it works.)
-            test_file_to_override = os.path.join(container_test_folder, "urls.py")
-            self.communicate_with_handling(f"cd /{self._repo_name} && git checkout -- tests/urls.py")
-            self.communicate_with_handling(f"echo 'from tests.prediction_assets.call_graph_tracer import register_runtime_trace; register_runtime_trace()' >> {test_file_to_override}")
+            # ## [PRO-864] Dynamic analysis work
+            # # TODO: generalize the file location
+            # # Inject test injecter:
+            # #   (Choosing urls.py is a hack: we know that `urls.py` is one of the dynamic imports from runtests.py, so appending to it works.)
+            # test_file_to_override = os.path.join(container_test_folder, "urls.py")
+            # self.communicate_with_handling(f"cd /{self._repo_name} && git checkout -- tests/urls.py")
+            # self.communicate_with_handling(f"echo 'from tests.prediction_assets.call_graph_tracer import register_runtime_trace; register_runtime_trace()' >> {test_file_to_override}")
             
             # pass_to_pass_cmd = make_pass_to_pass_test_cmd()
 

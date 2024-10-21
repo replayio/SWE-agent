@@ -644,6 +644,7 @@ class Agent:
             # Show instance template if prev. obs. was initial system message
             self.made_initial_prompt = True
             templates = [self.config.instance_template]
+            # ## [PRO-864] Dynamic analysis work
             # NOTE: Uncomment this to force-feed manually constructed data into initial prompt.
             # from sweagent.agent.manual_prompt_input import MANUAL_ANALYSIS_PROMPT
             # templates = [
