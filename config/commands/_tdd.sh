@@ -1,6 +1,20 @@
 # @yaml
-# docstring: Reproduces the current bug by running a test that was designed to fail as long as the bug exists.
 # tdd: true
+# signature: tdd_repro ["<target_file>"] ["<target_function_name>"] [<decl_lineno>]
+# docstring: Reproduces the bug by running bug-specific tests. Provide optional target arguments to get runtime context for the target function.
+# arguments:
+#  target_file:
+#     type: string
+#     description: The file containing the target function, relative to CWD. If provided, target_function_name is also required.
+#     required: false
+#  target_function_name:
+#     type: string
+#     description: The UNQUALIFIED(!) name of the target function or method.
+#     required: false
+#  decl_lineno:
+#     type: integer
+#     description: The lineno of target_function's declaration. Only required if target_function_name is ambiguous within the file.
+#     required: false
 tdd_repro() {
     # set -euo pipefail
     if [ -z "$TEST_CMD_FAIL_TO_PASS" ]; then
@@ -9,6 +23,10 @@ tdd_repro() {
     fi
     pushd $REPO_ROOT > /dev/null
     echo -e "Running tests to reproduce the bug (from $PWD):\n >$TEST_CMD_FAIL_TO_PASS\n"
+    if [ $# -ge 1 ]; then
+        line_no=${3:-0}
+        export TDD_TRACE_TARGET_CONFIG="{ \"target_file\": \"$1\", \"target_function_name\": \"$2\", \"decl_lineno\": $line_no}"
+    fi
     eval "$TEST_CMD_FAIL_TO_PASS"
 
     # include the continuation file if it exists

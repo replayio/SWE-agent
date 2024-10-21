@@ -285,6 +285,13 @@ class SWEEnv(gym.Env):
                 timeout_duration=LONG_TIMEOUT,
             )
         return self._repo_name
+    
+    def _write_cached_image(self):
+        self.communicate("env >> /.env")
+        assert self.container_obj is not None  # mypy
+        cached_image_name = self._get_cached_task_image_name()
+        self.container_obj.commit(cached_image_name)
+        self.logger.info(f"Container with environment {self.container_obj.id} cached as image {cached_image_name}")
 
     def reset(self, index: int | None = None) -> tuple[str | None, dict]:
         """
@@ -326,6 +333,10 @@ class SWEEnv(gym.Env):
                 self.communicate("export $(xargs </.env)")
 
                 self.init_container_prebake()
+
+                # # Overwrite image with new prebake settings.
+                # self._write_cached_image()
+
                 self.init_container_postbake()
 
                 return None, info
@@ -392,10 +403,7 @@ class SWEEnv(gym.Env):
         self.init_container_prebake()
 
         if self.args.cache_task_images:
-            self.communicate("env >> /.env")
-            assert self.container_obj is not None  # mypy
-            self.container_obj.commit(cached_image_name)
-            self.logger.info(f"Container with environment {self.container_obj.id} cached as image {cached_image_name}")
+            self._write_cached_image()
 
         self.init_container_postbake()
 
@@ -416,15 +424,37 @@ class SWEEnv(gym.Env):
               3. Re-run to have settings baked into the image.
         """
         self.communicate(f"export REPO_ROOT=\"/{self._repo_name}\"")
+        self.communicate(f"export CONDA_ENV_NAME=\"{self.env_name}\"")
         if self.tdd:
-            # Provide test_cmd for the instance's repo.
+            # Provide tdd data to the container.
+            self._prepare_test_patch()
             install_configs = self._get_install_configs()
-            # self.logger.warning(f"test_cmd: {repr(install_configs['test_cmd'])}")
+            instance_id = self.record['instance_id']
             if not install_configs["test_cmd"]:
-                raise RuntimeError(f"No test_cmd found in install configs for instance {self.record['instance_id']}: {repr(install_configs)}")
+                raise RuntimeError(f"No test_cmd found in install configs for instance {instance_id}: {repr(install_configs)}")
             
             fail_to_pass_cmd = make_fail_to_pass_test_cmd(self.record, install_configs["test_cmd"])
             self.communicate_with_handling(f'export TEST_CMD_FAIL_TO_PASS="{fail_to_pass_cmd}"')
+            self.communicate_with_handling(f'export TDD_INSTANCE_NAME="{instance_id}"')
+
+            # Copy prediction assets to the container
+            host_root = os.path.join(os.path.dirname(__file__), "../..")
+            host_asset_folder = os.path.abspath(os.path.join(host_root, "prediction_assets"))
+            container_test_folder = os.path.join("/" + self._repo_name, "tests")
+            self.communicate_with_handling(f"ls -l {container_test_folder}")
+            copy_anything_to_container(
+                self.container_obj,
+                host_asset_folder,
+                container_test_folder
+            )
+
+            # ## [PRO-864] Dynamic analysis work
+            # # TODO: generalize the file location
+            # # Inject test injecter:
+            # #   (Choosing urls.py is a hack: we know that `urls.py` is one of the dynamic imports from runtests.py, so appending to it works.)
+            # test_file_to_override = os.path.join(container_test_folder, "urls.py")
+            # self.communicate_with_handling(f"cd /{self._repo_name} && git checkout -- tests/urls.py")
+            # self.communicate_with_handling(f"echo 'from tests.prediction_assets.call_graph_tracer import register_runtime_trace; register_runtime_trace()' >> {test_file_to_override}")
             
             # pass_to_pass_cmd = make_pass_to_pass_test_cmd()
 
@@ -437,8 +467,9 @@ class SWEEnv(gym.Env):
         self.communicate_with_handling(f"source activate {self.env_name}")
         self.logger.debug(f"Activated container environment: {self.env_name}")
         if self.tdd:
-            # Apply test patch so the bug can be repro'ed at all.
+            # Apply test patch so the bug can be repro'ed.
             self._apply_test_patch()
+            
 
     def copy_string_to_container_file(self, content: str, container_file_path: str) -> None:
         with tempfile.NamedTemporaryFile(mode='w', delete=True) as temp_file:
@@ -453,15 +484,22 @@ class SWEEnv(gym.Env):
                 text=True
             )
 
+    @property
+    def _container_patch_path(self):
+        return "/root/test.patch"
+
+    def _prepare_test_patch(self):
+        patch = self.record["test_patch"]
+        self.copy_string_to_container_file(patch, self._container_patch_path)
+
+
     def _apply_test_patch(self):
         """
         Apply test patch for oracle setting
         """
         assert self.record is not None
-        container_patch_path = "/root/test.patch"
-        self.copy_string_to_container_file(self.record["test_patch"], container_patch_path)
         res = self.communicate_with_handling(
-            input=f"cd /{self._repo_name} && git apply -v {container_patch_path}",
+            input=f"cd /{self._repo_name} && git apply -v {self._container_patch_path}",
             error_msg="Failed to apply test patch correctly",
         )
         self.logger.debug(f"[TDD] Applied test patch - output:\n{res}")

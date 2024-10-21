@@ -221,9 +221,8 @@ create() {
 # arguments:
 #  command:
 #     type: string
-#     description: Shell command string to execute. Will execute with `eval "$@"`.
-#     required: truewith $PWD.
-#     required: false
+#     description: Shell command string to execute. Executes `eval "$@"`.
+#     required: true
 exec() {
     if [ $# -eq 0 ]; then
         echo "Usage: exec <command>"

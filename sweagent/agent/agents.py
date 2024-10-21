@@ -23,15 +23,15 @@ from sweagent.agent.models import (
     ModelQueryResult,
     get_last_valid_tool_use_name,
     get_model,
-    make_model_query_result,
     make_assistant_content,
+    make_model_query_result,
     make_user_reply_content,
 )
 from sweagent.agent.parsing import FormatError, ParseFunction
 from sweagent.environment.swe_env import SWEEnv
 from sweagent.utils.config import convert_path_to_abspath, convert_paths_to_abspath
-from sweagent.utils.log import get_logger
 from sweagent.utils.instrumentation import instrument
+from sweagent.utils.log import get_logger
 
 logger = get_logger("agents")
 
@@ -644,6 +644,13 @@ class Agent:
             # Show instance template if prev. obs. was initial system message
             self.made_initial_prompt = True
             templates = [self.config.instance_template]
+            # ## [PRO-864] Dynamic analysis work
+            # NOTE: Uncomment this to force-feed manually constructed data into initial prompt.
+            # from sweagent.agent.manual_prompt_input import MANUAL_ANALYSIS_PROMPT
+            # templates = [
+            #     self.config.instance_template,
+            #     self.config.next_step_template]
+            # observation = MANUAL_ANALYSIS_PROMPT
             if self.config.strategy_template is not None:
                 templates.append(self.config.strategy_template)
         elif observation is None or observation.strip() == "":
